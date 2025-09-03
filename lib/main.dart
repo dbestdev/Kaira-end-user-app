@@ -29,6 +29,13 @@ import 'features/support/presentation/pages/send_feedback_page.dart';
 import 'features/app_info/presentation/pages/terms_of_service_page.dart';
 import 'features/app_info/presentation/pages/privacy_policy_page.dart';
 import 'features/app_info/presentation/pages/about_kaira_page.dart';
+import 'features/artisans/presentation/pages/artisan_profile_page.dart';
+import 'features/artisans/presentation/pages/all_reviews_page.dart';
+import 'features/bookings/presentation/pages/booking_page.dart';
+import 'features/chat/presentation/pages/chat_page.dart';
+import 'features/home/presentation/pages/notifications_screen.dart';
+import 'features/services/presentation/pages/all_services_page.dart';
+import 'features/wallet/presentation/pages/wallet_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -173,6 +180,39 @@ class KairaApp extends StatelessWidget {
         },
         '/about-kaira': (context) {
           return const AboutKairaPage();
+        },
+        '/artisan-profile': (context) {
+          final args =
+              ModalRoute.of(context)!.settings.arguments
+                  as Map<String, dynamic>;
+          return ArtisanProfilePage(artisan: args['artisan']);
+        },
+        '/all-reviews': (context) {
+          final args =
+              ModalRoute.of(context)!.settings.arguments
+                  as Map<String, dynamic>;
+          return AllReviewsPage(artisan: args['artisan']);
+        },
+        '/booking': (context) {
+          final args =
+              ModalRoute.of(context)!.settings.arguments
+                  as Map<String, dynamic>;
+          return BookingPage(artisan: args['artisan']);
+        },
+        '/chat': (context) {
+          final args =
+              ModalRoute.of(context)!.settings.arguments
+                  as Map<String, dynamic>;
+          return ChatPage(artisan: args['artisan']);
+        },
+        '/notifications': (context) {
+          return const NotificationsScreen();
+        },
+        '/all-services': (context) {
+          return const AllServicesPage();
+        },
+        '/wallet': (context) {
+          return const WalletPage();
         },
       },
     );

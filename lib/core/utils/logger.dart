@@ -1,20 +1,21 @@
 import 'package:flutter/foundation.dart';
+import '../config/app_mode.dart';
 
 class Logger {
   static void debug(String message) {
-    if (kDebugMode) {
+    if (AppModeConfig.isDevelopment && kDebugMode) {
       print('🐛 DEBUG: $message');
     }
   }
 
   static void info(String message) {
-    if (kDebugMode) {
+    if (AppModeConfig.isDevelopment && kDebugMode) {
       print('ℹ️ INFO: $message');
     }
   }
 
   static void warning(String message) {
-    if (kDebugMode) {
+    if (AppModeConfig.isDevelopment && kDebugMode) {
       print('⚠️ WARNING: $message');
     }
   }
@@ -26,7 +27,7 @@ class Logger {
   }
 
   static void success(String message) {
-    if (kDebugMode) {
+    if (AppModeConfig.isDevelopment && kDebugMode) {
       print('✅ SUCCESS: $message');
     }
   }
