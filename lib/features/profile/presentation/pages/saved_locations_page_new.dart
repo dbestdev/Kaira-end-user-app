@@ -1,0 +1,1053 @@
+import 'dart:async';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:google_places_autocomplete_text_field/google_places_autocomplete_text_field.dart';
+import '../../../../core/models/saved_location_model.dart';
+import '../../../../core/services/saved_locations_service.dart';
+import '../../../../core/services/google_places_service.dart';
+
+class SavedLocationsPage extends StatefulWidget {
+  const SavedLocationsPage({super.key});
+
+  @override
+  State<SavedLocationsPage> createState() => _SavedLocationsPageState();
+}
+
+class _SavedLocationsPageState extends State<SavedLocationsPage> {
+  List<SavedLocationModel> _savedLocations = [];
+  bool _isLoading = true;
+  String? _error;
+
+  final SavedLocationsService _savedLocationsService = SavedLocationsService();
+  final GooglePlacesService _googlePlacesService = GooglePlacesService();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedLocations();
+  }
+
+  Future<void> _loadSavedLocations() async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+
+      final locations = await _savedLocationsService.getSavedLocations();
+      setState(() {
+        _savedLocations = locations;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey.shade50,
+      body: CustomScrollView(
+        slivers: [
+          SliverAppBar(
+            expandedHeight: 120,
+            floating: false,
+            pinned: true,
+            backgroundColor: const Color(0xFF2196F3),
+            flexibleSpace: FlexibleSpaceBar(
+              title: const Text(
+                'Saved Locations',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              background: Container(
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [Color(0xFF2196F3), Color(0xFF1976D2)],
+                  ),
+                ),
+                child: const Center(
+                  child: Icon(Icons.location_on, color: Colors.white, size: 48),
+                ),
+              ),
+            ),
+            actions: [
+              IconButton(
+                onPressed: _showAddLocationOptions,
+                icon: const Icon(Icons.add, color: Colors.white),
+              ),
+            ],
+          ),
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: _buildContent(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContent() {
+    if (_isLoading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(32),
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2196F3)),
+          ),
+        ),
+      );
+    }
+
+    if (_error != null) {
+      return _buildErrorState();
+    }
+
+    if (_savedLocations.isEmpty) {
+      return _buildEmptyState();
+    }
+
+    return _buildLocationsList();
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: const Color(0xFF2196F3).withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(50),
+              ),
+              child: const Icon(
+                Icons.location_on_outlined,
+                size: 48,
+                color: Color(0xFF2196F3),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'No Saved Locations',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1A1A1A),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Save your frequently used addresses for quick and easy service booking',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey.shade600,
+                height: 1.6,
+              ),
+            ),
+            const SizedBox(height: 40),
+            Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFF2196F3).withValues(alpha: 0.3),
+                    blurRadius: 12,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: ElevatedButton.icon(
+                onPressed: _showAddLocationOptions,
+                icon: const Icon(Icons.add_location, size: 20),
+                label: const Text(
+                  'Add Your First Location',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF2196F3),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 16,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.red.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(50),
+              ),
+              child: const Icon(
+                Icons.error_outline,
+                size: 48,
+                color: Colors.red,
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Error Loading Locations',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF1A1A1A),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              _error ?? 'Unknown error occurred',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.grey.shade600,
+                height: 1.6,
+              ),
+            ),
+            const SizedBox(height: 40),
+            ElevatedButton.icon(
+              onPressed: _loadSavedLocations,
+              icon: const Icon(Icons.refresh, size: 20),
+              label: const Text('Retry'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF2196F3),
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 32,
+                  vertical: 16,
+                ),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildLocationsList() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Your Saved Locations (${_savedLocations.length})',
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF1A1A1A),
+          ),
+        ),
+        const SizedBox(height: 16),
+        ListView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: _savedLocations.length,
+          itemBuilder: (context, index) {
+            final location = _savedLocations[index];
+            return _buildLocationCard(location);
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLocationCard(SavedLocationModel location) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () => _showLocationDetails(location),
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: location.isDefault
+                        ? const Color(0xFF2196F3).withValues(alpha: 0.1)
+                        : Colors.grey.shade100,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    location.isDefault ? Icons.home : Icons.location_on,
+                    color: location.isDefault
+                        ? const Color(0xFF2196F3)
+                        : Colors.grey.shade600,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              location.name,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: Color(0xFF1A1A1A),
+                              ),
+                            ),
+                          ),
+                          if (location.isDefault)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 4,
+                              ),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2196F3),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Text(
+                                'Default',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        location.address,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey.shade600,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (location.description != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          location.description!,
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade500,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                PopupMenuButton<String>(
+                  onSelected: (value) => _handleLocationAction(value, location),
+                  itemBuilder: (context) => [
+                    const PopupMenuItem(
+                      value: 'set_default',
+                      child: Row(
+                        children: [
+                          Icon(Icons.home, size: 20),
+                          SizedBox(width: 8),
+                          Text('Set as Default'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'edit',
+                      child: Row(
+                        children: [
+                          Icon(Icons.edit, size: 20),
+                          SizedBox(width: 8),
+                          Text('Edit'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'copy',
+                      child: Row(
+                        children: [
+                          Icon(Icons.copy, size: 20),
+                          SizedBox(width: 8),
+                          Text('Copy Address'),
+                        ],
+                      ),
+                    ),
+                    const PopupMenuItem(
+                      value: 'delete',
+                      child: Row(
+                        children: [
+                          Icon(Icons.delete, size: 20, color: Colors.red),
+                          SizedBox(width: 8),
+                          Text('Delete', style: TextStyle(color: Colors.red)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showAddLocationOptions() {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Add New Location',
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            _buildOptionTile(
+              icon: Icons.search,
+              title: 'Search Places',
+              subtitle: 'Find and add any address',
+              onTap: () {
+                Navigator.pop(context);
+                _showGooglePlacesSearch();
+              },
+            ),
+            _buildOptionTile(
+              icon: Icons.my_location,
+              title: 'Use Current Location',
+              subtitle: 'Add your current position',
+              onTap: () {
+                Navigator.pop(context);
+                _useCurrentLocation();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOptionTile({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: const Color(0xFF2196F3).withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, color: const Color(0xFF2196F3)),
+      ),
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
+      subtitle: Text(subtitle),
+      onTap: onTap,
+    );
+  }
+
+  void _showGooglePlacesSearch() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            _GooglePlacesSearchPage(onPlaceSelected: _addLocationFromPlace),
+      ),
+    );
+  }
+
+  void _useCurrentLocation() async {
+    try {
+      // Show loading dialog
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(
+          child: CircularProgressIndicator(
+            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2196F3)),
+          ),
+        ),
+      );
+
+      // Get current position
+      final position = await Geolocator.getCurrentPosition(
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
+      );
+
+      // Get address from coordinates
+      final placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      Navigator.pop(context); // Close loading dialog
+
+      if (placemarks.isNotEmpty) {
+        final placemark = placemarks.first;
+        final address = [
+          placemark.street,
+          placemark.locality,
+          placemark.administrativeArea,
+          placemark.country,
+        ].where((element) => element != null && element.isNotEmpty).join(', ');
+
+        _showLocationNameDialog(
+          address: address,
+          latitude: position.latitude,
+          longitude: position.longitude,
+        );
+      } else {
+        _showErrorSnackBar('Could not get address for current location');
+      }
+    } catch (e) {
+      Navigator.pop(context); // Close loading dialog
+      _showErrorSnackBar('Error getting current location: $e');
+    }
+  }
+
+  void _addLocationFromPlace(GooglePlace place) async {
+    // If coordinates are not available, fetch them
+    if (place.latitude == 0.0 && place.longitude == 0.0) {
+      try {
+        // Show loading dialog
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => const Center(
+            child: CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2196F3)),
+            ),
+          ),
+        );
+
+        // Fetch place details to get coordinates
+        final placeDetails = await _googlePlacesService.getPlaceDetails(
+          place.placeId,
+        );
+
+        Navigator.pop(context); // Close loading dialog
+
+        _showLocationNameDialog(
+          address: placeDetails.address,
+          latitude: placeDetails.latitude,
+          longitude: placeDetails.longitude,
+          placeId: placeDetails.placeId,
+        );
+      } catch (e) {
+        Navigator.pop(context); // Close loading dialog
+        _showErrorSnackBar('Error getting place details: $e');
+      }
+    } else {
+      _showLocationNameDialog(
+        address: place.address,
+        latitude: place.latitude,
+        longitude: place.longitude,
+        placeId: place.placeId,
+      );
+    }
+  }
+
+  void _addLocationFromData({
+    required String name,
+    required String address,
+    required double latitude,
+    required double longitude,
+    String? description,
+    String? placeId,
+  }) async {
+    try {
+      await _savedLocationsService.addSavedLocation(
+        name: name,
+        address: address,
+        latitude: latitude,
+        longitude: longitude,
+        description: description,
+        placeId: placeId,
+      );
+
+      _showSuccessSnackBar('Location saved successfully!');
+      _loadSavedLocations(); // Refresh the list
+    } catch (e) {
+      _showErrorSnackBar('Error saving location: $e');
+    }
+  }
+
+  void _showLocationDetails(SavedLocationModel location) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(location.name),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Address: ${location.address}'),
+            if (location.description != null)
+              Text('Description: ${location.description}'),
+            Text('Coordinates: ${location.latitude}, ${location.longitude}'),
+            Text('Added: ${location.timeAgo}'),
+            if (location.isDefault) const Text('Status: Default Location'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLocationNameDialog({
+    required String address,
+    required double latitude,
+    required double longitude,
+    String? placeId,
+  }) {
+    showDialog(
+      context: context,
+      builder: (context) => _LocationNameDialog(
+        address: address,
+        latitude: latitude,
+        longitude: longitude,
+        placeId: placeId,
+        onSave: (name, address, latitude, longitude, description, placeId) {
+          _addLocationFromData(
+            name: name,
+            address: address,
+            latitude: latitude,
+            longitude: longitude,
+            description: description,
+            placeId: placeId,
+          );
+        },
+      ),
+    );
+  }
+
+  void _handleLocationAction(String action, SavedLocationModel location) {
+    switch (action) {
+      case 'set_default':
+        _setAsDefault(location);
+        break;
+      case 'edit':
+        _showEditLocationDialog(location);
+        break;
+      case 'copy':
+        _copyAddress(location);
+        break;
+      case 'delete':
+        _showDeleteConfirmation(location);
+        break;
+    }
+  }
+
+  void _setAsDefault(SavedLocationModel location) async {
+    try {
+      await _savedLocationsService.setDefaultLocation(location.id);
+      _showSuccessSnackBar('Default location updated!');
+      _loadSavedLocations(); // Refresh the list
+    } catch (e) {
+      _showErrorSnackBar('Error setting default location: $e');
+    }
+  }
+
+  void _showEditLocationDialog(SavedLocationModel location) {
+    showDialog(
+      context: context,
+      builder: (context) => _LocationNameDialog(
+        address: location.address,
+        latitude: location.latitude,
+        longitude: location.longitude,
+        placeId: location.placeId,
+        initialName: location.name,
+        initialDescription: location.description,
+        onSave:
+            (name, address, latitude, longitude, description, placeId) async {
+              try {
+                await _savedLocationsService.updateSavedLocation(
+                  id: location.id,
+                  name: name,
+                  address: address,
+                  latitude: latitude,
+                  longitude: longitude,
+                  description: description,
+                  placeId: placeId,
+                );
+                _showSuccessSnackBar('Location updated successfully!');
+                _loadSavedLocations(); // Refresh the list
+              } catch (e) {
+                _showErrorSnackBar('Error updating location: $e');
+              }
+            },
+      ),
+    );
+  }
+
+  void _copyAddress(SavedLocationModel location) {
+    Clipboard.setData(ClipboardData(text: location.address));
+    _showSuccessSnackBar('Address copied to clipboard!');
+  }
+
+  void _showDeleteConfirmation(SavedLocationModel location) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete Location'),
+        content: Text('Are you sure you want to delete "${location.name}"?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await _savedLocationsService.deleteSavedLocation(location.id);
+                _showSuccessSnackBar('Location deleted successfully!');
+                _loadSavedLocations(); // Refresh the list
+              } catch (e) {
+                _showErrorSnackBar('Error deleting location: $e');
+              }
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+}
+
+class _GooglePlacesSearchPage extends StatefulWidget {
+  final Function(GooglePlace) onPlaceSelected;
+
+  const _GooglePlacesSearchPage({required this.onPlaceSelected});
+
+  @override
+  State<_GooglePlacesSearchPage> createState() =>
+      _GooglePlacesSearchPageState();
+}
+
+class _GooglePlacesSearchPageState extends State<_GooglePlacesSearchPage> {
+  final TextEditingController _searchController = TextEditingController();
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.grey.shade50,
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF2196F3),
+        foregroundColor: Colors.white,
+        elevation: 0,
+        title: const Text(
+          'Search Places',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+        ),
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          children: [
+            GooglePlacesAutoCompleteTextFormField(
+              textEditingController: _searchController,
+              config: const GoogleApiConfig(
+                apiKey: 'AIzaSyCjvdD8hCL6QvuGqbDJgCH9v_qvIdVObu0',
+                countries: ['ng'], // Nigeria
+                fetchPlaceDetailsWithCoordinates: true,
+                debounceTime: 400,
+              ),
+
+              onSuggestionClicked: (prediction) {
+                _searchController.text = prediction.description ?? '';
+                _searchController.selection = TextSelection.fromPosition(
+                  TextPosition(offset: prediction.description?.length ?? 0),
+                );
+              },
+              decoration: InputDecoration(
+                hintText: 'Search for places, addresses...',
+                hintStyle: TextStyle(color: Colors.grey.shade500),
+                prefixIcon: Icon(Icons.search, color: Colors.grey.shade600),
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 16,
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Expanded(child: _buildEmptyState()),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2196F3).withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(50),
+            ),
+            child: const Icon(Icons.search, color: Color(0xFF2196F3), size: 48),
+          ),
+          const SizedBox(height: 24),
+          const Text(
+            'Start typing to search',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: Color(0xFF1A1A1A),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Type to find restaurants, landmarks, addresses, and more',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 14, color: Colors.grey.shade600),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LocationNameDialog extends StatefulWidget {
+  final String address;
+  final double latitude;
+  final double longitude;
+  final String? placeId;
+  final String? initialName;
+  final String? initialDescription;
+  final Function(
+    String name,
+    String address,
+    double latitude,
+    double longitude,
+    String? description,
+    String? placeId,
+  )
+  onSave;
+
+  const _LocationNameDialog({
+    required this.address,
+    required this.latitude,
+    required this.longitude,
+    this.placeId,
+    this.initialName,
+    this.initialDescription,
+    required this.onSave,
+  });
+
+  @override
+  State<_LocationNameDialog> createState() => _LocationNameDialogState();
+}
+
+class _LocationNameDialogState extends State<_LocationNameDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _nameController = TextEditingController();
+  final _descriptionController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController.text = widget.initialName ?? '';
+    _descriptionController.text = widget.initialDescription ?? '';
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descriptionController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Save Location'),
+      content: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextFormField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: 'Location Name *',
+                hintText: 'e.g., Home, Office, Gym',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.label_outline),
+              ),
+              validator: (value) {
+                if (value == null || value.trim().isEmpty) {
+                  return 'Please enter a location name';
+                }
+                return null;
+              },
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              initialValue: widget.address,
+              readOnly: true,
+              decoration: const InputDecoration(
+                labelText: 'Address',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.location_on),
+              ),
+            ),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _descriptionController,
+              decoration: const InputDecoration(
+                labelText: 'Description (Optional)',
+                hintText: 'Add a note about this location',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.note_outlined),
+              ),
+              maxLines: 2,
+            ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: _saveLocation,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF2196F3),
+            foregroundColor: Colors.white,
+          ),
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+
+  void _saveLocation() {
+    if (_formKey.currentState!.validate()) {
+      widget.onSave(
+        _nameController.text.trim(),
+        widget.address,
+        widget.latitude,
+        widget.longitude,
+        _descriptionController.text.trim().isEmpty
+            ? null
+            : _descriptionController.text.trim(),
+        widget.placeId,
+      );
+      Navigator.pop(context);
+    }
+  }
+}
