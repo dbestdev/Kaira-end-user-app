@@ -577,38 +577,56 @@ class _SignUpPageState extends State<SignUpPage> {
         confirmPassword: signUpData['confirmPassword']!,
       );
 
+      // Debug: Print the response for troubleshooting
+      print('Signup response: $response');
+      print('OTP sent status: ${response['data']?['otpSent']}');
+
       if (mounted) {
         setState(() {
           _isLoading = false;
         });
 
         // Verify we got a successful response before navigating
-        if (response['success'] != false) {
-          // Show success message
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                response['message'] ?? 'Signup initiated successfully!',
+        if (response['success'] == true) {
+          // Check if OTP was actually sent successfully
+          final data = response['data'];
+          if (data != null && data['otpSent'] == true) {
+            // Show success message
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  response['message'] ?? 'Signup initiated successfully!',
+                ),
+                backgroundColor: Colors.green,
+                behavior: SnackBarBehavior.floating,
+                duration: const Duration(seconds: 2),
               ),
-              backgroundColor: Colors.green,
-              behavior: SnackBarBehavior.floating,
-            ),
-          );
+            );
 
-          // Navigate to OTP verification page
-          Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (context) => OtpVerificationPage(
-                signUpData: signUpData,
-                phoneNumber: signUpData['phoneNumber']!,
-                email: signUpData['email']!,
+            // Navigate to OTP verification page only after confirming OTP was sent
+            Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (context) => OtpVerificationPage(
+                  signUpData: signUpData,
+                  phoneNumber: signUpData['phoneNumber']!,
+                  email: signUpData['email']!,
+                ),
               ),
-            ),
+            );
+          } else {
+            // OTP was not sent successfully
+            throw Exception(
+              'Failed to send verification code. Please try again.',
+            );
+          }
+        } else if (response['success'] == false) {
+          // Handle explicit failure response
+          throw Exception(
+            response['message'] ?? 'Signup failed. Please try again.',
           );
         } else {
-          throw Exception(
-            'Signup failed: ${response['message'] ?? 'Unknown error'}',
-          );
+          // Handle unexpected response format
+          throw Exception('Unexpected response format. Please try again.');
         }
       }
     } catch (e) {
@@ -625,6 +643,20 @@ class _SignUpPageState extends State<SignUpPage> {
             e.toString().contains('Connection timeout')) {
           errorMessage =
               'Cannot connect to server. Please check your internet connection and try again.';
+        } else if (e.toString().contains('Failed to send verification code') ||
+            e.toString().contains('Failed to send OTP')) {
+          errorMessage =
+              'Failed to send verification code. Please check your phone number and try again.';
+        } else if (e.toString().contains(
+          'Phone number is already registered',
+        )) {
+          errorMessage =
+              'This phone number is already registered. Please use a different number or try logging in.';
+        } else if (e.toString().contains(
+          'Email address is already registered',
+        )) {
+          errorMessage =
+              'This email address is already registered. Please use a different email or try logging in.';
         } else {
           errorMessage = 'Signup failed: ${e.toString()}';
         }
