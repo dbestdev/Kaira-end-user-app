@@ -17,7 +17,7 @@ enum AppMode { development, production }
 
 class AppModeConfig {
   // Change this to switch modes
-  static const AppMode currentMode = AppMode.development;
+  static const AppMode currentMode = AppMode.production;
 
   // Helper getters
   static bool get isDevelopment => currentMode == AppMode.development;
