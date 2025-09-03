@@ -58,33 +58,15 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _checkAuthStatusAndNavigate() async {
     try {
-      // In development mode, skip authentication and go directly to onboarding
-      if (AppConstants.skipAuthentication) {
-        if (mounted) {
-          Navigator.pushReplacementNamed(context, '/onboarding');
-        }
-        return;
-      }
-
-      final prefs = await SharedPreferences.getInstance();
-      final isLoggedIn = prefs.getBool('isLoggedIn') ?? false;
-      final hasCompletedOnboarding =
-          prefs.getBool(AppConstants.onboardingCompletedKey) ?? false;
-
-      // For testing: Force onboarding to show in production mode
+      // Always start with onboarding regardless of mode
+      // This ensures consistent user experience
       if (mounted) {
-        if (!hasCompletedOnboarding) {
-          Navigator.pushReplacementNamed(context, '/onboarding');
-        } else if (isLoggedIn) {
-          Navigator.pushReplacementNamed(context, '/home');
-        } else {
-          Navigator.pushReplacementNamed(context, '/guest-dashboard');
-        }
+        Navigator.pushReplacementNamed(context, '/onboarding');
       }
     } catch (e) {
-      // Fallback to guest dashboard
+      // Fallback to onboarding if there's any error
       if (mounted) {
-        Navigator.pushReplacementNamed(context, '/guest-dashboard');
+        Navigator.pushReplacementNamed(context, '/onboarding');
       }
     }
   }

@@ -4,13 +4,13 @@
 // Development Mode:
 // - Skips authentication
 // - Shows development indicators
-// - Goes directly to onboarding then guest dashboard
+// - Always starts with onboarding screen
 // - Uses localhost API endpoints
 //
 // Production Mode:
 // - Full authentication flow
 // - No development indicators
-// - Normal app flow with login/signup
+// - Always starts with onboarding screen
 // - Uses production API endpoints
 
 enum AppMode { development, production }
@@ -25,7 +25,7 @@ class AppModeConfig {
 
   // Development flags
   static bool get skipAuthentication => isDevelopment;
-  static bool get skipOnboarding => false; // Always show onboarding
+  static bool get skipOnboarding => false; // Always show onboarding first
   static bool get showDevIndicators => isDevelopment;
 
   // Environment selection
