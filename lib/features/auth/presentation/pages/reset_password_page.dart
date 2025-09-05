@@ -64,7 +64,7 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
   bool _isLoading = false;
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
-  String? _errorMessage;
+
   String? _successMessage;
 
   // Real-time validation states
@@ -137,7 +137,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
     try {
       setState(() {
         _isLoading = true;
-        _errorMessage = null;
         _successMessage = null;
       });
 
@@ -167,8 +166,37 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = e.toString();
         });
+
+        // Show user-friendly error message
+        String errorMessage = 'Password reset failed';
+        if (e.toString().contains('Invalid reset token') ||
+            e.toString().contains('Token expired')) {
+          errorMessage =
+              'Reset link has expired. Please request a new password reset.';
+        } else if (e.toString().contains('Connection failed') ||
+            e.toString().contains('No internet connection') ||
+            e.toString().contains('Connection timeout')) {
+          errorMessage =
+              'Cannot connect to server. Please check your internet connection and try again.';
+        } else if (e.toString().contains('Password too weak')) {
+          errorMessage =
+              'Password is too weak. Please choose a stronger password.';
+        } else if (e.toString().contains('Passwords do not match')) {
+          errorMessage =
+              'Passwords do not match. Please make sure both passwords are identical.';
+        } else {
+          errorMessage = 'Password reset failed: ${e.toString()}';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
       }
     }
   }
@@ -428,12 +456,11 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
 
                         const SizedBox(height: 24),
 
-                        // Error/Success Messages
-                        if (_errorMessage != null) _buildErrorMessage(),
+                        // Success Messages
                         if (_successMessage != null) _buildSuccessMessage(),
 
-                        // Back to Login Button (when there's an error)
-                        if (_errorMessage != null) ...[
+                        // Back to Login Button
+                        ...[
                           const SizedBox(height: 24),
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -669,38 +696,6 @@ class _ResetPasswordPageState extends State<ResetPasswordPage>
                   ),
                 ],
               ),
-      ),
-    );
-  }
-
-  Widget _buildErrorMessage() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.red.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.shade200, width: 1),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.error_outline, color: Colors.red.shade600, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              _errorMessage!,
-              style: TextStyle(color: Colors.red.shade700, fontSize: 14),
-            ),
-          ),
-          IconButton(
-            onPressed: () {
-              setState(() {
-                _errorMessage = null;
-              });
-            },
-            icon: Icon(Icons.close, color: Colors.red.shade600, size: 20),
-          ),
-        ],
       ),
     );
   }

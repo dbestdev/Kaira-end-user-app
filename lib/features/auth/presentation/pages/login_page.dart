@@ -4,7 +4,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../../../../core/services/auth_service.dart';
 import '../../../../core/utils/phone_utils.dart';
-import '../../../../core/widgets/error_display.dart';
+
 import '../../../../core/constants/app_constants.dart';
 
 // Custom phone number formatter
@@ -105,7 +105,7 @@ class _LoginPageState extends State<LoginPage> {
   bool _isPasswordVisible = false;
   bool _isLoading = false;
   bool _usePhoneNumber = true; // Default to phone number for Nigerian users
-  String? _errorMessage; // For storing error messages
+
   bool _rememberMe = false; // Remember me option
 
   @override
@@ -157,7 +157,6 @@ class _LoginPageState extends State<LoginPage> {
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
-        _errorMessage = null; // Clear any previous errors
       });
 
       try {
@@ -213,10 +212,41 @@ class _LoginPageState extends State<LoginPage> {
           }
         });
       } catch (e) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = e.toString();
-        });
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+
+          // Show user-friendly error message
+          String errorMessage = 'Login failed';
+          if (e.toString().contains('Invalid credentials') ||
+              e.toString().contains('Invalid email/phone or password')) {
+            errorMessage =
+                'Invalid email/phone number or password. Please check your credentials and try again.';
+          } else if (e.toString().contains('Connection failed') ||
+              e.toString().contains('No internet connection') ||
+              e.toString().contains('Connection timeout')) {
+            errorMessage =
+                'Cannot connect to server. Please check your internet connection and try again.';
+          } else if (e.toString().contains('Account not verified')) {
+            errorMessage =
+                'Your account is not verified. Please check your email for verification instructions.';
+          } else if (e.toString().contains('Account deactivated')) {
+            errorMessage =
+                'Your account has been deactivated. Please contact support for assistance.';
+          } else {
+            errorMessage = 'Login failed: ${e.toString()}';
+          }
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(errorMessage),
+              backgroundColor: Colors.red,
+              behavior: SnackBarBehavior.floating,
+              duration: const Duration(seconds: 4),
+            ),
+          );
+        }
       }
     }
   }
@@ -637,19 +667,6 @@ class _LoginPageState extends State<LoginPage> {
                     const SizedBox(height: 32),
 
                     const SizedBox(height: 16),
-
-                    // Error Display
-                    if (_errorMessage != null) ...[
-                      ErrorDisplay(
-                        message: _errorMessage!,
-                        onRetry: () {
-                          setState(() {
-                            _errorMessage = null;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 4),
-                    ],
 
                     // Login Button
                     Container(

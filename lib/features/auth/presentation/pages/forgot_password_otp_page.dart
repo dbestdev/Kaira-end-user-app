@@ -32,7 +32,7 @@ class _ForgotPasswordOtpPageState extends State<ForgotPasswordOtpPage>
 
   bool _isLoading = false;
   bool _isResending = false;
-  String? _errorMessage;
+
   String? _successMessage;
 
   // Timer for resend countdown
@@ -102,7 +102,6 @@ class _ForgotPasswordOtpPageState extends State<ForgotPasswordOtpPage>
     try {
       setState(() {
         _isLoading = true;
-        _errorMessage = null;
       });
 
       final otp = _otpControllers.map((c) => c.text).join();
@@ -138,11 +137,36 @@ class _ForgotPasswordOtpPageState extends State<ForgotPasswordOtpPage>
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = e.toString();
         });
 
         // Clear OTP input fields on error
         _clearOtpFields();
+
+        // Show user-friendly error message
+        String errorMessage = 'OTP verification failed';
+        if (e.toString().contains('Invalid OTP') ||
+            e.toString().contains('OTP expired')) {
+          errorMessage =
+              'Invalid or expired OTP. Please check your email and try again.';
+        } else if (e.toString().contains('Connection failed') ||
+            e.toString().contains('No internet connection') ||
+            e.toString().contains('Connection timeout')) {
+          errorMessage =
+              'Cannot connect to server. Please check your internet connection and try again.';
+        } else if (e.toString().contains('OTP not found')) {
+          errorMessage = 'OTP not found. Please request a new reset code.';
+        } else {
+          errorMessage = 'OTP verification failed: ${e.toString()}';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
       }
     }
   }
@@ -153,7 +177,6 @@ class _ForgotPasswordOtpPageState extends State<ForgotPasswordOtpPage>
     try {
       setState(() {
         _isResending = true;
-        _errorMessage = null;
         _successMessage = null;
       });
 
@@ -181,7 +204,6 @@ class _ForgotPasswordOtpPageState extends State<ForgotPasswordOtpPage>
       if (mounted) {
         setState(() {
           _isResending = false;
-          _errorMessage = e.toString();
         });
 
         // Clear OTP input fields on error
@@ -359,8 +381,7 @@ class _ForgotPasswordOtpPageState extends State<ForgotPasswordOtpPage>
 
                       const SizedBox(height: 32),
 
-                      // Error/Success Messages
-                      if (_errorMessage != null) _buildErrorMessage(),
+                      // Success Messages
                       if (_successMessage != null) _buildSuccessMessage(),
 
                       // Bottom spacing for fixed button
@@ -673,38 +694,6 @@ class _ForgotPasswordOtpPageState extends State<ForgotPasswordOtpPage>
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                 ),
         ),
-      ),
-    );
-  }
-
-  Widget _buildErrorMessage() {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.red.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.shade200, width: 1),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.error_outline, color: Colors.red.shade600, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              _errorMessage!,
-              style: TextStyle(color: Colors.red.shade700, fontSize: 14),
-            ),
-          ),
-          IconButton(
-            onPressed: () {
-              setState(() {
-                _errorMessage = null;
-              });
-            },
-            icon: Icon(Icons.close, color: Colors.red.shade600, size: 20),
-          ),
-        ],
       ),
     );
   }

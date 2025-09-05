@@ -50,12 +50,14 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
   bool _isEmailOtpVerified = false;
   bool _isResendingSms = false;
   bool _isResendingEmail = false;
-  String? _errorMessage;
+
   String? _successMessage;
 
-  // Timer for resend countdown
-  int _resendCountdown = 60;
-  bool _canResend = false;
+  // Separate timers for SMS and Email OTP resend countdown
+  int _smsResendCountdown = 60;
+  bool _canResendSms = false;
+  int _emailResendCountdown = 60;
+  bool _canResendEmail = false;
 
   final AuthService _authService = AuthService();
 
@@ -73,18 +75,18 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
     // Don't start timer immediately - wait for initial OTP to be sent
   }
 
-  void _startResendTimer() {
-    _canResend = false;
-    _resendCountdown = 60;
+  void _startSmsResendTimer() {
+    _canResendSms = false;
+    _smsResendCountdown = 60;
 
     Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
         setState(() {
-          if (_resendCountdown > 0) {
-            _resendCountdown--;
+          if (_smsResendCountdown > 0) {
+            _smsResendCountdown--;
           } else {
-            _canResend = true;
-            _resendCountdown = 0;
+            _canResendSms = true;
+            _smsResendCountdown = 0;
             timer.cancel();
           }
         });
@@ -94,18 +96,18 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
     });
   }
 
-  void _resetResendTimer() {
-    _canResend = false;
-    _resendCountdown = 60;
-    // Start a new timer
+  void _startEmailResendTimer() {
+    _canResendEmail = false;
+    _emailResendCountdown = 60;
+
     Timer.periodic(const Duration(seconds: 1), (timer) {
       if (mounted) {
         setState(() {
-          if (_resendCountdown > 0) {
-            _resendCountdown--;
+          if (_emailResendCountdown > 0) {
+            _emailResendCountdown--;
           } else {
-            _canResend = true;
-            _resendCountdown = 0;
+            _canResendEmail = true;
+            _emailResendCountdown = 0;
             timer.cancel();
           }
         });
@@ -113,6 +115,18 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
         timer.cancel();
       }
     });
+  }
+
+  void _resetSmsResendTimer() {
+    _canResendSms = false;
+    _smsResendCountdown = 60;
+    _startSmsResendTimer();
+  }
+
+  void _resetEmailResendTimer() {
+    _canResendEmail = false;
+    _emailResendCountdown = 60;
+    _startEmailResendTimer();
   }
 
   void _initializeAnimations() {
@@ -144,7 +158,6 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
     try {
       setState(() {
         _isLoading = true;
-        _errorMessage = null;
       });
 
       // Send SMS OTP first
@@ -157,8 +170,8 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
           _successMessage = 'SMS OTP sent to ${widget.phoneNumber}';
         });
 
-        // Start the resend timer after OTP is successfully sent
-        _startResendTimer();
+        // Start the SMS resend timer after OTP is successfully sent
+        _startSmsResendTimer();
 
         // Clear success message after 3 seconds
         Future.delayed(const Duration(seconds: 3), () {
@@ -173,7 +186,6 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = e.toString();
         });
       }
     }
@@ -183,7 +195,6 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
     try {
       setState(() {
         _isLoading = true;
-        _errorMessage = null;
       });
 
       final smsOtp = _smsOtpControllers.map((c) => c.text).join();
@@ -206,6 +217,9 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
           _successMessage = 'Phone number verified! Check your email for OTP.';
         });
 
+        // Start the email resend timer when email OTP section becomes visible
+        _startEmailResendTimer();
+
         // Clear success message after 1 second
         Future.delayed(const Duration(seconds: 1), () {
           if (mounted) {
@@ -222,18 +236,37 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
       if (mounted) {
         setState(() {
           _isLoading = false;
-          // Provide more user-friendly error messages
-          if (e.toString().contains('timeout') ||
-              e.toString().contains('Connection timeout')) {
-            _errorMessage =
-                'SMS verification is taking longer than expected. Please wait and try again.';
-          } else {
-            _errorMessage = e.toString();
-          }
         });
 
         // Clear OTP input fields on error
         _clearSmsOtpFields();
+
+        // Show user-friendly error message
+        String errorMessage = 'SMS verification failed';
+        if (e.toString().contains('Invalid OTP') ||
+            e.toString().contains('OTP expired')) {
+          errorMessage =
+              'Invalid or expired OTP. Please check your SMS and try again.';
+        } else if (e.toString().contains('timeout') ||
+            e.toString().contains('Connection timeout')) {
+          errorMessage =
+              'SMS verification is taking longer than expected. Please wait and try again.';
+        } else if (e.toString().contains('Connection failed') ||
+            e.toString().contains('No internet connection')) {
+          errorMessage =
+              'Cannot connect to server. Please check your internet connection and try again.';
+        } else {
+          errorMessage = 'SMS verification failed: ${e.toString()}';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
       }
     }
   }
@@ -244,7 +277,6 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
     try {
       setState(() {
         _isLoading = true;
-        _errorMessage = null;
       });
 
       final emailOtp = _emailOtpControllers.map((c) => c.text).join();
@@ -283,18 +315,37 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
       if (mounted) {
         setState(() {
           _isLoading = false;
-          // Provide more user-friendly error messages
-          if (e.toString().contains('timeout') ||
-              e.toString().contains('Connection timeout')) {
-            _errorMessage =
-                'Email verification is taking longer than expected. Please wait and try again.';
-          } else {
-            _errorMessage = e.toString();
-          }
         });
 
         // Clear OTP input fields on error
         _clearEmailOtpFields();
+
+        // Show user-friendly error message
+        String errorMessage = 'Email verification failed';
+        if (e.toString().contains('Invalid OTP') ||
+            e.toString().contains('OTP expired')) {
+          errorMessage =
+              'Invalid or expired OTP. Please check your email and try again.';
+        } else if (e.toString().contains('timeout') ||
+            e.toString().contains('Connection timeout')) {
+          errorMessage =
+              'Email verification is taking longer than expected. Please wait and try again.';
+        } else if (e.toString().contains('Connection failed') ||
+            e.toString().contains('No internet connection')) {
+          errorMessage =
+              'Cannot connect to server. Please check your internet connection and try again.';
+        } else {
+          errorMessage = 'Email verification failed: ${e.toString()}';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
       }
     }
   }
@@ -305,7 +356,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
     try {
       setState(() {
         _isResendingSms = true;
-        _errorMessage = null;
+
         _successMessage = null;
       });
 
@@ -318,8 +369,8 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
           _successMessage = 'SMS OTP resent successfully!';
         });
 
-        // Reset resend timer
-        _resetResendTimer();
+        // Reset SMS resend timer
+        _resetSmsResendTimer();
 
         // Clear success message after 1 second
         Future.delayed(const Duration(seconds: 1), () {
@@ -334,11 +385,30 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
       if (mounted) {
         setState(() {
           _isResendingSms = false;
-          _errorMessage = e.toString();
         });
 
         // Clear OTP input fields on error
         _clearSmsOtpFields();
+
+        // Show user-friendly error message
+        String errorMessage = 'Failed to resend SMS OTP';
+        if (e.toString().contains('Connection failed') ||
+            e.toString().contains('No internet connection') ||
+            e.toString().contains('Connection timeout')) {
+          errorMessage =
+              'Cannot connect to server. Please check your internet connection and try again.';
+        } else {
+          errorMessage = 'Failed to resend SMS OTP: ${e.toString()}';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
       }
     }
   }
@@ -349,7 +419,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
     try {
       setState(() {
         _isResendingEmail = true;
-        _errorMessage = null;
+
         _successMessage = null;
       });
 
@@ -361,8 +431,8 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
           _successMessage = 'Email OTP resent successfully!';
         });
 
-        // Reset resend timer
-        _resetResendTimer();
+        // Reset email resend timer
+        _resetEmailResendTimer();
 
         // Clear success message after 1 second
         Future.delayed(const Duration(seconds: 1), () {
@@ -377,11 +447,30 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
       if (mounted) {
         setState(() {
           _isResendingEmail = false;
-          _errorMessage = e.toString();
         });
 
         // Clear OTP input fields after error
         _clearEmailOtpFields();
+
+        // Show user-friendly error message
+        String errorMessage = 'Failed to resend email OTP';
+        if (e.toString().contains('Connection failed') ||
+            e.toString().contains('No internet connection') ||
+            e.toString().contains('Connection timeout')) {
+          errorMessage =
+              'Cannot connect to server. Please check your internet connection and try again.';
+        } else {
+          errorMessage = 'Failed to resend email OTP: ${e.toString()}';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
       }
     }
   }
@@ -581,8 +670,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
 
                       const SizedBox(height: 32),
 
-                      // Error/Success Messages
-                      if (_errorMessage != null) _buildErrorMessage(),
+                      // Success Messages
                       if (_successMessage != null) _buildSuccessMessage(),
 
                       // Bottom spacing for fixed button
@@ -816,7 +904,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
           // Resend OTP Button
           Center(
             child: TextButton(
-              onPressed: (_isResendingSms || !_canResend)
+              onPressed: (_isResendingSms || !_canResendSms)
                   ? null
                   : _resendSmsOtp,
               child: _isResendingSms
@@ -830,13 +918,13 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
                         ),
                       ),
                     )
-                  : !_canResend
+                  : !_canResendSms
                   ? Text(
-                      _resendCountdown > 0
-                          ? 'Resend in $_resendCountdown seconds'
+                      _smsResendCountdown > 0
+                          ? 'Resend in $_smsResendCountdown seconds'
                           : 'Resend SMS OTP',
                       style: TextStyle(
-                        color: _resendCountdown > 0
+                        color: _smsResendCountdown > 0
                             ? Colors.grey.shade500
                             : Color(0xFF2196F3),
                         fontWeight: FontWeight.w500,
@@ -970,7 +1058,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
           // Resend OTP Button
           Center(
             child: TextButton(
-              onPressed: (_isResendingEmail || !_canResend)
+              onPressed: (_isResendingEmail || !_canResendEmail)
                   ? null
                   : _resendEmailOtp,
               child: _isResendingEmail
@@ -984,13 +1072,13 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
                         ),
                       ),
                     )
-                  : !_canResend
+                  : !_canResendEmail
                   ? Text(
-                      _resendCountdown > 0
-                          ? 'Resend in $_resendCountdown seconds'
+                      _emailResendCountdown > 0
+                          ? 'Resend in $_emailResendCountdown seconds'
                           : 'Resend Email OTP',
                       style: TextStyle(
-                        color: _resendCountdown > 0
+                        color: _emailResendCountdown > 0
                             ? Colors.grey.shade500
                             : Color(0xFF2196F3),
                         fontWeight: FontWeight.w500,
@@ -1005,85 +1093,6 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
                     ),
             ),
           ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildErrorMessage() {
-    final isTimeoutError =
-        _errorMessage != null &&
-        (_errorMessage!.contains('timeout') ||
-            _errorMessage!.contains('Connection timeout'));
-
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 8),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.red.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.shade200, width: 1),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.error_outline, color: Colors.red.shade600, size: 20),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  _errorMessage!,
-                  style: TextStyle(color: Colors.red.shade700, fontSize: 14),
-                ),
-              ),
-              IconButton(
-                onPressed: () {
-                  setState(() {
-                    _errorMessage = null;
-                  });
-                },
-                icon: Icon(Icons.close, color: Colors.red.shade600, size: 20),
-              ),
-            ],
-          ),
-          if (isTimeoutError) ...[
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: _isLoading
-                        ? null
-                        : () {
-                            setState(() {
-                              _errorMessage = null;
-                            });
-                            // Retry the last operation
-                            if (_isSmsOtpVerified) {
-                              _verifyEmailOtp();
-                            } else {
-                              _verifySmsOtp();
-                            }
-                          },
-                    icon: const Icon(Icons.refresh, size: 16),
-                    label: const Text('Retry'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF2196F3),
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
         ],
       ),
     );

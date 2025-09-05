@@ -56,7 +56,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage>
 
   bool _isLoading = false;
   bool _isEmailValid = false;
-  String? _errorMessage;
+
   String? _successMessage;
 
   final AuthService _authService = AuthService();
@@ -110,7 +110,6 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage>
     try {
       setState(() {
         _isLoading = true;
-        _errorMessage = null;
         _successMessage = null;
       });
 
@@ -138,8 +137,33 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage>
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = e.toString();
         });
+
+        // Show user-friendly error message
+        String errorMessage = 'Failed to send reset code';
+        if (e.toString().contains('Email not found') ||
+            e.toString().contains('User not found')) {
+          errorMessage =
+              'No account found with this email address. Please check your email or create a new account.';
+        } else if (e.toString().contains('Connection failed') ||
+            e.toString().contains('No internet connection') ||
+            e.toString().contains('Connection timeout')) {
+          errorMessage =
+              'Cannot connect to server. Please check your internet connection and try again.';
+        } else if (e.toString().contains('Invalid email')) {
+          errorMessage = 'Please enter a valid email address.';
+        } else {
+          errorMessage = 'Failed to send reset code: ${e.toString()}';
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            duration: const Duration(seconds: 4),
+          ),
+        );
       }
     }
   }
@@ -343,8 +367,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage>
 
                         const SizedBox(height: 24),
 
-                        // Error/Success Messages
-                        if (_errorMessage != null) _buildErrorMessage(),
+                        // Success Messages
                         if (_successMessage != null) _buildSuccessMessage(),
 
                         const SizedBox(height: 24),
@@ -508,38 +531,6 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage>
                   ),
                 ],
               ),
-      ),
-    );
-  }
-
-  Widget _buildErrorMessage() {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.red.shade50,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.shade200, width: 1),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.error_outline, color: Colors.red.shade600, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              _errorMessage!,
-              style: TextStyle(color: Colors.red.shade700, fontSize: 14),
-            ),
-          ),
-          IconButton(
-            onPressed: () {
-              setState(() {
-                _errorMessage = null;
-              });
-            },
-            icon: Icon(Icons.close, color: Colors.red.shade600, size: 20),
-          ),
-        ],
       ),
     );
   }
