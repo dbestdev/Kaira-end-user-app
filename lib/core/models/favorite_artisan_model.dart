@@ -4,7 +4,6 @@ class FavoriteArtisanModel {
   final String artisanId;
   final ArtisanInfo artisan;
   final DateTime createdAt;
-  final DateTime updatedAt;
 
   FavoriteArtisanModel({
     required this.id,
@@ -12,7 +11,6 @@ class FavoriteArtisanModel {
     required this.artisanId,
     required this.artisan,
     required this.createdAt,
-    required this.updatedAt,
   });
 
   factory FavoriteArtisanModel.fromJson(Map<String, dynamic> json) {
@@ -22,7 +20,6 @@ class FavoriteArtisanModel {
       artisanId: json['artisanId'] ?? '',
       artisan: ArtisanInfo.fromJson(json['artisan'] ?? {}),
       createdAt: DateTime.parse(json['createdAt']),
-      updatedAt: DateTime.parse(json['updatedAt']),
     );
   }
 
@@ -33,7 +30,6 @@ class FavoriteArtisanModel {
       'artisanId': artisanId,
       'artisan': artisan.toJson(),
       'createdAt': createdAt.toIso8601String(),
-      'updatedAt': updatedAt.toIso8601String(),
     };
   }
 }
