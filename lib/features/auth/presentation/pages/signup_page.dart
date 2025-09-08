@@ -1265,7 +1265,6 @@ class _SignUpPageState extends State<SignUpPage> {
                       ),
                     ),
 
-
                     const SizedBox(height: 24),
 
                     // Already have account
