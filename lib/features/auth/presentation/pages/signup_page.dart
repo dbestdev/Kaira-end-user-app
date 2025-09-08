@@ -58,7 +58,6 @@ class _SignUpPageState extends State<SignUpPage> {
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   bool _acceptTerms = false;
-  String? _errorMessage;
   DateTime? _lastSubmissionTime;
 
   // Real-time validation states
@@ -335,14 +334,12 @@ class _SignUpPageState extends State<SignUpPage> {
   void _validateFirstName(String value) {
     setState(() {
       _isFirstNameValid = value.length >= 2;
-      _errorMessage = null; // Clear error when user starts typing
     });
   }
 
   void _validateLastName(String value) {
     setState(() {
       _isLastNameValid = value.length >= 2;
-      _errorMessage = null; // Clear error when user starts typing
     });
   }
 
@@ -352,7 +349,6 @@ class _SignUpPageState extends State<SignUpPage> {
       _isPhoneValid =
           cleanPhone.length == 11 &&
           _validPrefixes.contains(cleanPhone.substring(0, 3));
-      _errorMessage = null; // Clear error when user starts typing
     });
   }
 
@@ -360,7 +356,6 @@ class _SignUpPageState extends State<SignUpPage> {
     final emailRegex = RegExp(r'^[a-zA-Z0-9.]+@[a-zA-Z0-9]+\.[a-zA-Z]+');
     setState(() {
       _isEmailValid = emailRegex.hasMatch(value);
-      _errorMessage = null; // Clear error when user starts typing
     });
   }
 
@@ -372,7 +367,6 @@ class _SignUpPageState extends State<SignUpPage> {
           value.contains(RegExp(r'[a-z]')) &&
           value.contains(RegExp(r'[0-9]')) &&
           value.contains(RegExp(r'[!@#$%^&*(),.?":{}|<>]'));
-      _errorMessage = null; // Clear error when user starts typing
     });
   }
 
@@ -380,7 +374,6 @@ class _SignUpPageState extends State<SignUpPage> {
     setState(() {
       _isConfirmPasswordValid =
           value == _passwordController.text && value.isNotEmpty;
-      _errorMessage = null; // Clear error when user starts typing
     });
   }
 
@@ -548,7 +541,6 @@ class _SignUpPageState extends State<SignUpPage> {
 
     setState(() {
       _isLoading = true;
-      _errorMessage = null; // Clear any previous errors
       _lastSubmissionTime = now; // Update submission timestamp
     });
 
@@ -659,7 +651,6 @@ class _SignUpPageState extends State<SignUpPage> {
       if (mounted) {
         setState(() {
           _isLoading = false;
-          _errorMessage = e.toString();
         });
 
         // Show error message
@@ -1097,8 +1088,6 @@ class _SignUpPageState extends State<SignUpPage> {
                             onChanged: (value) {
                               setState(() {
                                 _acceptTerms = value ?? false;
-                                _errorMessage =
-                                    null; // Clear error when user toggles terms
                               });
                             },
                             activeColor: const Color(0xFF2196F3),
@@ -1276,53 +1265,6 @@ class _SignUpPageState extends State<SignUpPage> {
                       ),
                     ),
 
-                    // Error Display
-                    if (_errorMessage != null) ...[
-                      const SizedBox(height: 16),
-                      Container(
-                        margin: const EdgeInsets.symmetric(horizontal: 16),
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.red.shade50,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: Colors.red.shade200,
-                            width: 1,
-                          ),
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.error_outline,
-                              color: Colors.red.shade600,
-                              size: 20,
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Text(
-                                _errorMessage!,
-                                style: TextStyle(
-                                  color: Colors.red.shade700,
-                                  fontSize: 14,
-                                ),
-                              ),
-                            ),
-                            IconButton(
-                              onPressed: () {
-                                setState(() {
-                                  _errorMessage = null;
-                                });
-                              },
-                              icon: Icon(
-                                Icons.close,
-                                color: Colors.red.shade600,
-                                size: 20,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
 
                     const SizedBox(height: 24),
 
