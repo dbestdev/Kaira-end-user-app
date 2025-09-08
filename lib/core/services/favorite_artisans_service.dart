@@ -45,9 +45,7 @@ class FavoriteArtisansService {
   /// Remove an artisan from favorites
   Future<void> removeFromFavorites(String artisanId) async {
     try {
-      await _apiService.delete(
-        '/favorite-artisans/$artisanId',
-      );
+      await _apiService.delete('/favorite-artisans/$artisanId');
     } on DioException catch (e) {
       throw _handleDioException(e);
     } catch (e) {

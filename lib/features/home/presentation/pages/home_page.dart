@@ -354,7 +354,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         });
       }
     } catch (e) {
-      print('Error loading notification stats: $e');
+      // Handle error silently
     }
   }
 
@@ -380,47 +380,34 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   // Load user data from local storage first, then server
   Future<void> _loadUserData() async {
     try {
-      print('🔄 Loading user data...');
-
       // First, try to load from local storage (this is the correct user data)
       await _loadLocalUserData();
 
       // If we have local data, use it and optionally sync with server in background
       if (_currentUser['email'] != null && _currentUser['email'].isNotEmpty) {
-        print('✅ Using local user data: ${_currentUser['email']}');
-
         // Optionally sync with server in background (don't wait for it)
         _syncWithServerInBackground();
       } else {
-        print('❌ No local user data, trying server...');
         // Only call server if no local data
         await _loadFromServer();
       }
     } catch (e) {
-      print('❌ Error loading user data: $e');
       // Keep default values if loading fails
-    } finally {
-      print('🏁 User data loading complete');
-    }
+    } finally {}
   }
 
   // Load user data from server
   Future<void> _loadFromServer() async {
     try {
-      print('📡 Calling getUserProfile API...');
       final userProfile = await _userService.getUserProfile();
-      print('✅ API Response: $userProfile');
 
       // Update current user data with server data
       final userData = userProfile['data']?['user'] ?? userProfile;
-      print('👤 Extracted user data: $userData');
 
       setState(() {
         _currentUser = _buildUserDataFromResponse(userData);
       });
-      print('✅ Updated _currentUser from server: $_currentUser');
     } catch (serverError) {
-      print('❌ Server error: $serverError');
       // Keep existing data if server fails
     }
   }
@@ -428,7 +415,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   // Sync with server in background (non-blocking)
   Future<void> _syncWithServerInBackground() async {
     try {
-      print('🔄 Syncing with server in background...');
       final userProfile = await _userService.getUserProfile();
       final userData = userProfile['data']?['user'] ?? userProfile;
 
@@ -437,10 +423,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         setState(() {
           _currentUser = _buildUserDataFromResponse(userData);
         });
-        print('✅ Background sync completed: ${userData['email']}');
       }
     } catch (e) {
-      print('❌ Background sync failed: $e');
       // Don't update UI if sync fails
     }
   }
@@ -526,7 +510,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         });
       }
     } catch (e) {
-      print('Error loading local user data: $e');
     }
   }
 
@@ -3161,8 +3144,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             child: TextField(
                               controller: _searchController,
                               onChanged: _onSearchChanged,
-                              onTap: () =>
-                                  print('🎯 TextField tapped!'), // Debug tap
+                              onTap: () {
+                                // Focus on search field
+                              },
                               decoration: InputDecoration(
                                 hintText: 'What service do you need?',
                                 hintStyle: TextStyle(

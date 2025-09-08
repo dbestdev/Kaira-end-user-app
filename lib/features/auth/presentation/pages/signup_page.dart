@@ -589,7 +589,6 @@ class _SignUpPageState extends State<SignUpPage> {
         confirmPassword: signUpData['confirmPassword']!,
       );
 
-
       if (mounted) {
         setState(() {
           _isLoading = false;
