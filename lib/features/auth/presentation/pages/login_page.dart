@@ -256,7 +256,6 @@ class _LoginPageState extends State<LoginPage> {
     if (_rememberMe) {
       // TODO: Implement secure storage for credentials
       // For now, we'll just store a flag that credentials should be remembered
-      print('Remember Me: Credentials will be saved');
     }
   }
 
@@ -264,7 +263,6 @@ class _LoginPageState extends State<LoginPage> {
   Future<void> _restoreCredentials() async {
     // TODO: Implement secure storage retrieval
     // For now, we'll just check if credentials should be restored
-    print('Remember Me: Checking for saved credentials');
   }
 
   @override
@@ -816,21 +814,15 @@ class _LoginPageState extends State<LoginPage> {
       if (userData != null) {
         // Store user data in SharedPreferences
         await prefs.setString('userData', jsonEncode(userData));
-        print('✅ Stored user data: $userData');
 
         // Store auth token if available
         final accessToken = responseData?['accessToken'];
         if (accessToken != null) {
           await prefs.setString(AppConstants.tokenKey, accessToken);
-          print('✅ Stored access token: ${accessToken.substring(0, 20)}...');
-        } else {
-          print('❌ No access token in response');
         }
-      } else {
-        print('❌ No user data in response');
       }
     } catch (e) {
-      print('❌ Error storing user data: $e');
+      // Handle error silently
     }
   }
 }

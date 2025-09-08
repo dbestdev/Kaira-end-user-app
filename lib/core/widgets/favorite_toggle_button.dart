@@ -118,10 +118,7 @@ class _FavoriteToggleButtonState extends State<FavoriteToggleButton>
       }
     } catch (e) {
       if (mounted) {
-        // Log the error for debugging
-        print('❌ Favorite toggle error: $e');
-        print('❌ Artisan ID: ${widget.artisanId}');
-        print('❌ Artisan Name: ${widget.artisanName}');
+        // Handle error silently
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(

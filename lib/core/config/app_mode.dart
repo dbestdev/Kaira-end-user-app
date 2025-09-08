@@ -36,16 +36,10 @@ class AppModeConfig {
   static void setDevelopmentMode() {
     // This would need to be implemented with a more sophisticated approach
     // For now, just change the currentMode constant above
-    print(
-      'To switch to development mode, change currentMode to AppMode.development',
-    );
   }
 
   static void setProductionMode() {
     // This would need to be implemented with a more sophisticated approach
     // For now, just change the currentMode constant above
-    print(
-      'To switch to production mode, change currentMode to AppMode.production',
-    );
   }
 }

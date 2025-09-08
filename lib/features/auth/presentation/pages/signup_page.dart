@@ -577,17 +577,7 @@ class _SignUpPageState extends State<SignUpPage> {
       // Format for Termii API (234... without + sign)
       final formattedPhone = '234${cleanPhone.substring(1)}'; // 2349037128859
 
-      // Debug: Print the phone number formatting
-      print('Original phone: ${signUpData['phoneNumber']}');
-      print('Clean phone: $cleanPhone');
-      print('Phone prefix: $prefix');
-      print('Formatted phone: $formattedPhone');
-      print('Formatted length: ${formattedPhone.length}');
-
       // Call backend to initiate signup
-      print('🚀 Starting signup process...');
-      print('📧 Email: ${signUpData['email']}');
-      print('📱 Phone: $formattedPhone');
 
       final authService = AuthService();
       final response = await authService.initiateSignup(
@@ -599,11 +589,6 @@ class _SignUpPageState extends State<SignUpPage> {
         confirmPassword: signUpData['confirmPassword']!,
       );
 
-      // Debug: Print the response for troubleshooting
-      print('✅ Signup response received: $response');
-      print('📊 Success status: ${response['success']}');
-      print('📝 Message: ${response['message']}');
-      print('📱 OTP sent status: ${response['data']?['otpSent']}');
 
       if (mounted) {
         setState(() {

@@ -14,16 +14,7 @@ class FavoriteArtisansService {
 
       // The backend returns a list directly
       if (response is List) {
-        print('📥 Received ${response.length} favorite artisans');
-        for (int i = 0; i < response.length; i++) {
-          final artisan = response[i];
-          print(
-            '📊 Artisan $i: ${artisan['artisan']?['user']?['firstName']} ${artisan['artisan']?['user']?['lastName']}',
-          );
-          print(
-            '🖼️ Profile picture: ${artisan['artisan']?['user']?['profilePicture']}',
-          );
-        }
+        // Process favorite artisans
         return response
             .map((json) => FavoriteArtisanModel.fromJson(json))
             .toList();
@@ -40,17 +31,13 @@ class FavoriteArtisansService {
   /// Add an artisan to favorites
   Future<FavoriteArtisanModel> addToFavorites(String artisanId) async {
     try {
-      print('📤 Adding artisan to favorites: $artisanId');
       final response = await _apiService.post('/favorite-artisans', {
         'artisanId': artisanId,
       });
-      print('📥 Add response: $response');
       return FavoriteArtisanModel.fromJson(response);
     } on DioException catch (e) {
-      print('❌ DioException in addToFavorites: $e');
       throw _handleDioException(e);
     } catch (e) {
-      print('❌ Unexpected error in addToFavorites: $e');
       throw Exception('Unexpected error: $e');
     }
   }
@@ -58,17 +45,12 @@ class FavoriteArtisansService {
   /// Remove an artisan from favorites
   Future<void> removeFromFavorites(String artisanId) async {
     try {
-      print('📤 Removing artisan from favorites: $artisanId');
-      final response = await _apiService.delete(
+      await _apiService.delete(
         '/favorite-artisans/$artisanId',
       );
-      print('📥 Remove response: $response');
-      print('✅ Successfully removed artisan from favorites');
     } on DioException catch (e) {
-      print('❌ DioException in removeFromFavorites: $e');
       throw _handleDioException(e);
     } catch (e) {
-      print('❌ Unexpected error in removeFromFavorites: $e');
       throw Exception('Unexpected error: $e');
     }
   }
@@ -76,20 +58,15 @@ class FavoriteArtisansService {
   /// Check if an artisan is in favorites
   Future<bool> isFavorite(String artisanId) async {
     try {
-      print('🔍 Checking if artisan is favorite: $artisanId');
       final response = await _apiService.get(
         '/favorite-artisans/check/$artisanId',
       );
-      print('📥 isFavorite response: $response');
       final isFav = response['isFavorite'] ?? false;
-      print('📊 isFavorite result: $isFav');
       return isFav;
-    } on DioException catch (e) {
-      print('❌ DioException in isFavorite: $e');
+    } on DioException {
       // If there's an error, assume it's not a favorite
       return false;
     } catch (e) {
-      print('❌ Unexpected error in isFavorite: $e');
       return false;
     }
   }
@@ -109,23 +86,16 @@ class FavoriteArtisansService {
   /// Toggle favorite status (add if not favorite, remove if favorite)
   Future<bool> toggleFavorite(String artisanId) async {
     try {
-      print('🔄 Toggling favorite for artisan: $artisanId');
       final isCurrentlyFavorite = await isFavorite(artisanId);
-      print('📊 Current favorite status: $isCurrentlyFavorite');
 
       if (isCurrentlyFavorite) {
-        print('🗑️ Removing from favorites...');
         await removeFromFavorites(artisanId);
-        print('✅ Successfully removed from favorites');
         return false; // Now not favorite
       } else {
-        print('➕ Adding to favorites...');
         await addToFavorites(artisanId);
-        print('✅ Successfully added to favorites');
         return true; // Now favorite
       }
     } catch (e) {
-      print('❌ Error in toggleFavorite: $e');
       throw Exception('Failed to toggle favorite status: $e');
     }
   }

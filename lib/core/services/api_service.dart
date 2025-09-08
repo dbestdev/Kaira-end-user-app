@@ -2,7 +2,7 @@ import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/app_constants.dart';
-import '../utils/logger.dart';
+// import '../utils/logger.dart'; // Removed - using silent error handling
 
 class ApiService {
   static String get baseUrl => AppConstants.baseUrl;
@@ -51,7 +51,6 @@ class ApiService {
               }
             } catch (e) {
               // Silently fail for auth token retrieval to avoid blocking requests
-              Logger.error('Error getting auth token: $e');
             }
           }
           handler.next(options);

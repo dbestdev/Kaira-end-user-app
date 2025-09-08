@@ -301,18 +301,12 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
         // Store user data from the response
         if (data != null && data['user'] != null) {
           await prefs.setString('userData', jsonEncode(data['user']));
-          print('✅ Stored user data after signup: ${data['user']}');
 
           // Store auth token if available
           final accessToken = data['accessToken'];
           if (accessToken != null) {
             await prefs.setString('auth_token', accessToken);
-            print(
-              '✅ Stored access token after signup: ${accessToken.substring(0, 20)}...',
-            );
           }
-        } else {
-          print('❌ No user data in signup response');
         }
 
         // Navigate immediately after storing data
