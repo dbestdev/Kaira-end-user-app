@@ -59,6 +59,7 @@ class _SignUpPageState extends State<SignUpPage> {
   bool _obscureConfirmPassword = true;
   bool _acceptTerms = false;
   String? _errorMessage;
+  DateTime? _lastSubmissionTime;
 
   // Real-time validation states
   bool _isFirstNameValid = false;
@@ -508,6 +509,29 @@ class _SignUpPageState extends State<SignUpPage> {
   }
 
   Future<void> _handleSignUp() async {
+    // Prevent multiple submissions
+    if (_isLoading) {
+      return;
+    }
+
+    // Debounce: Prevent rapid-fire submissions (minimum 2 seconds between attempts)
+    final now = DateTime.now();
+    if (_lastSubmissionTime != null) {
+      final timeDiff = now.difference(_lastSubmissionTime!).inSeconds;
+      if (timeDiff < 2) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Please wait ${2 - timeDiff} seconds before trying again',
+            ),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+        return;
+      }
+    }
+
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -524,6 +548,8 @@ class _SignUpPageState extends State<SignUpPage> {
 
     setState(() {
       _isLoading = true;
+      _errorMessage = null; // Clear any previous errors
+      _lastSubmissionTime = now; // Update submission timestamp
     });
 
     try {
@@ -648,8 +674,9 @@ class _SignUpPageState extends State<SignUpPage> {
           errorMessage =
               'Failed to send verification code. Please check your phone number and try again.';
         } else if (e.toString().contains(
-          'Phone number is already registered',
-        )) {
+              'Phone number is already registered',
+            ) ||
+            e.toString().contains('already registered')) {
           errorMessage =
               'This phone number is already registered. Please use a different number or try logging in.';
         } else if (e.toString().contains(
@@ -657,6 +684,14 @@ class _SignUpPageState extends State<SignUpPage> {
         )) {
           errorMessage =
               'This email address is already registered. Please use a different email or try logging in.';
+        } else if (e.toString().contains(
+          'Please wait before requesting another OTP',
+        )) {
+          errorMessage =
+              'Please wait a moment before requesting another verification code.';
+        } else if (e.toString().contains('Invalid phone number format')) {
+          errorMessage =
+              'Invalid phone number format. Please enter a valid Nigerian phone number.';
         } else {
           errorMessage = 'Signup failed: ${e.toString()}';
         }
