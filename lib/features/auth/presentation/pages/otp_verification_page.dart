@@ -282,8 +282,14 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
         setState(() {
           _isEmailOtpVerified = true;
           _isLoading = false;
-          _successMessage =
-              'Account created successfully! Welcome to Kaira! 🎉';
+          
+          // Check if account already exists
+          final data = response['data'];
+          if (data != null && data['accountExists'] == true) {
+            _successMessage = 'Account already exists! You can now login.';
+          } else {
+            _successMessage = 'Account created successfully! Welcome to Kaira! 🎉';
+          }
         });
 
         // Set authentication status and navigate to home page after 2 seconds
@@ -308,10 +314,14 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
 
         // Show user-friendly error message
         String errorMessage = 'Email verification failed';
-        if (e.toString().contains('Invalid OTP') ||
+        if (e.toString().contains('No pending Email OTP found')) {
+          errorMessage = 'No pending email verification found. Please request a new OTP.';
+        } else if (e.toString().contains('Invalid OTP') ||
             e.toString().contains('OTP expired')) {
           errorMessage =
               'Invalid or expired OTP. Please check your email and try again.';
+        } else if (e.toString().contains('already verified')) {
+          errorMessage = 'Email already verified. You can proceed to login.';
         } else if (e.toString().contains('timeout') ||
             e.toString().contains('Connection timeout')) {
           errorMessage =
