@@ -280,48 +280,45 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
       );
 
       if (mounted) {
+        // Check if account already exists
+        final data = response['data'];
+        if (data != null && data['accountExists'] == true) {
+          _successMessage = 'Account already exists! You can now login.';
+        } else {
+          _successMessage =
+              'Account created successfully! Welcome to Kaira! 🎉';
+        }
+
         setState(() {
           _isEmailOtpVerified = true;
           _isLoading = false;
-
-          // Check if account already exists
-          final data = response['data'];
-          if (data != null && data['accountExists'] == true) {
-            _successMessage = 'Account already exists! You can now login.';
-          } else {
-            _successMessage =
-                'Account created successfully! Welcome to Kaira! 🎉';
-          }
         });
 
-        // Set authentication status and navigate to home page after 2 seconds
-        Future.delayed(const Duration(seconds: 2), () async {
-          if (mounted) {
-            // Store user data and authentication status
-            final prefs = await SharedPreferences.getInstance();
-            await prefs.setBool('isLoggedIn', true);
+        // Store user data and authentication status immediately
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('isLoggedIn', true);
 
-            // Store user data from the response
-            final data = response['data'];
-            if (data != null && data['user'] != null) {
-              await prefs.setString('userData', jsonEncode(data['user']));
-              print('✅ Stored user data after signup: ${data['user']}');
+        // Store user data from the response
+        if (data != null && data['user'] != null) {
+          await prefs.setString('userData', jsonEncode(data['user']));
+          print('✅ Stored user data after signup: ${data['user']}');
 
-              // Store auth token if available
-              final accessToken = data['accessToken'];
-              if (accessToken != null) {
-                await prefs.setString('auth_token', accessToken);
-                print(
-                  '✅ Stored access token after signup: ${accessToken.substring(0, 20)}...',
-                );
-              }
-            } else {
-              print('❌ No user data in signup response');
-            }
-
-            Navigator.of(context).pushReplacementNamed('/home');
+          // Store auth token if available
+          final accessToken = data['accessToken'];
+          if (accessToken != null) {
+            await prefs.setString('auth_token', accessToken);
+            print(
+              '✅ Stored access token after signup: ${accessToken.substring(0, 20)}...',
+            );
           }
-        });
+        } else {
+          print('❌ No user data in signup response');
+        }
+
+        // Navigate immediately after storing data
+        if (mounted) {
+          Navigator.of(context).pushReplacementNamed('/home');
+        }
       }
     } catch (e) {
       if (mounted) {

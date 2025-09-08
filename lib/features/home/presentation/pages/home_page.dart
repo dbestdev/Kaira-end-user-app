@@ -384,11 +384,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
       // First, try to load from local storage (this is the correct user data)
       await _loadLocalUserData();
-      
+
       // If we have local data, use it and optionally sync with server in background
       if (_currentUser['email'] != null && _currentUser['email'].isNotEmpty) {
         print('✅ Using local user data: ${_currentUser['email']}');
-        
+
         // Optionally sync with server in background (don't wait for it)
         _syncWithServerInBackground();
       } else {
@@ -431,7 +431,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       print('🔄 Syncing with server in background...');
       final userProfile = await _userService.getUserProfile();
       final userData = userProfile['data']?['user'] ?? userProfile;
-      
+
       // Only update if we got valid data
       if (userData['email'] != null && userData['email'].isNotEmpty) {
         setState(() {
@@ -446,9 +446,12 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   }
 
   // Build user data from API response
-  Map<String, dynamic> _buildUserDataFromResponse(Map<String, dynamic> userData) {
+  Map<String, dynamic> _buildUserDataFromResponse(
+    Map<String, dynamic> userData,
+  ) {
     return {
-      'name': '${userData['firstName'] ?? ''} ${userData['lastName'] ?? ''}'.trim(),
+      'name': '${userData['firstName'] ?? ''} ${userData['lastName'] ?? ''}'
+          .trim(),
       'email': userData['email'] ?? '',
       'phoneNumber': userData['phoneNumber'] ?? '',
       'firstName': userData['firstName'],
@@ -458,30 +461,34 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       'rating': (userData['rating'] ?? 0.0).toDouble(),
       'reviewsCount': userData['reviewsCount'] ?? 0,
       'profilePicture': userData['profilePicture'],
-      'wallet': userData['wallet'] ?? {
-        'balance': 0.0,
-        'currency': 'NGN',
-        'fundingHistory': [],
-        'withdrawalHistory': [],
-        'transactionHistory': [],
-        'lastTransactionDate': null,
-        'totalFunded': 0.0,
-        'totalWithdrawn': 0.0,
-        'isActive': true,
-      },
-      'bookings': userData['bookings'] ?? {
-        'totalBookings': 0,
-        'completedBookings': 0,
-        'pendingBookings': 0,
-        'activeBookings': 0,
-        'cancelledBookings': 0,
-        'upcomingBookings': 0,
-        'totalSpent': 0.0,
-        'averageBookingValue': 0.0,
-        'lastBookingDate': null,
-        'favoriteServices': [],
-        'bookingHistory': [],
-      },
+      'wallet':
+          userData['wallet'] ??
+          {
+            'balance': 0.0,
+            'currency': 'NGN',
+            'fundingHistory': [],
+            'withdrawalHistory': [],
+            'transactionHistory': [],
+            'lastTransactionDate': null,
+            'totalFunded': 0.0,
+            'totalWithdrawn': 0.0,
+            'isActive': true,
+          },
+      'bookings':
+          userData['bookings'] ??
+          {
+            'totalBookings': 0,
+            'completedBookings': 0,
+            'pendingBookings': 0,
+            'activeBookings': 0,
+            'cancelledBookings': 0,
+            'upcomingBookings': 0,
+            'totalSpent': 0.0,
+            'averageBookingValue': 0.0,
+            'lastBookingDate': null,
+            'favoriteServices': [],
+            'bookingHistory': [],
+          },
       'walletBalance': (userData['wallet']?['balance'] ?? 0.0).toDouble(),
       'totalBookings': userData['bookings']?['totalBookings'] ?? 0,
       'completedBookings': userData['bookings']?['completedBookings'] ?? 0,
