@@ -155,39 +155,25 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
   // Timer methods removed - no more waiting restrictions
 
   Future<void> _sendInitialOtp() async {
-    try {
+    // OTP is already sent during signup initiation
+    // Just start the resend timer and show success message
+    if (mounted) {
       setState(() {
-        _isLoading = true;
+        _isLoading = false;
+        _successMessage = 'SMS OTP sent to ${widget.phoneNumber}';
       });
 
-      // Send SMS OTP first
-      final formattedPhone = _formatPhoneNumber(widget.phoneNumber);
-      await _authService.sendOtp(identifier: formattedPhone, type: 'sms');
+      // Start the SMS resend timer
+      _startSmsResendTimer();
 
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _successMessage = 'SMS OTP sent to ${widget.phoneNumber}';
-        });
-
-        // Start the SMS resend timer after OTP is successfully sent
-        _startSmsResendTimer();
-
-        // Clear success message after 3 seconds
-        Future.delayed(const Duration(seconds: 3), () {
-          if (mounted) {
-            setState(() {
-              _successMessage = null;
-            });
-          }
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      // Clear success message after 3 seconds
+      Future.delayed(const Duration(seconds: 3), () {
+        if (mounted) {
+          setState(() {
+            _successMessage = null;
+          });
+        }
+      });
     }
   }
 
