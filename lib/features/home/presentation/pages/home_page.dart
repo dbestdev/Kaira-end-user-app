@@ -509,8 +509,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           };
         });
       }
-    } catch (e) {
-    }
+    } catch (e) {}
   }
 
   // Navigate to profile page
