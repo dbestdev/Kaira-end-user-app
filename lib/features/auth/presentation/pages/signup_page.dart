@@ -588,7 +588,7 @@ class _SignUpPageState extends State<SignUpPage> {
       print('🚀 Starting signup process...');
       print('📧 Email: ${signUpData['email']}');
       print('📱 Phone: $formattedPhone');
-      
+
       final authService = AuthService();
       final response = await authService.initiateSignup(
         firstName: signUpData['firstName']!,
@@ -670,12 +670,16 @@ class _SignUpPageState extends State<SignUpPage> {
             e.toString().contains('Failed to send OTP')) {
           errorMessage =
               'Failed to send verification code. Please check your phone number and try again.';
-        } else if (e.toString().contains('Email address is already registered') ||
+        } else if (e.toString().contains(
+              'Email address is already registered',
+            ) ||
             e.toString().contains('email is already registered') ||
             e.toString().contains('Email already exists')) {
           errorMessage =
               'This email address is already registered. Please use a different email or try logging in.';
-        } else if (e.toString().contains('Phone number is already registered') ||
+        } else if (e.toString().contains(
+              'Phone number is already registered',
+            ) ||
             e.toString().contains('phone number is already registered') ||
             e.toString().contains('Phone already exists')) {
           errorMessage =

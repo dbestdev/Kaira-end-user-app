@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../constants/app_constants.dart';
 import '../utils/logger.dart';
@@ -26,9 +27,14 @@ class ApiService {
     // Add interceptors for logging and error handling
     _dio.interceptors.add(
       LogInterceptor(
-        requestBody: true,
-        responseBody: true,
-        logPrint: (object) => Logger.debug('DIO: $object'),
+        requestBody: false, // Disable request body logging for performance
+        responseBody: false, // Disable response body logging for performance
+        logPrint: (object) {
+          // Only log in debug mode and for important requests
+          if (kDebugMode) {
+            print('DIO: $object');
+          }
+        },
       ),
     );
 
@@ -38,13 +44,14 @@ class ApiService {
         onRequest: (options, handler) async {
           // Add auth token to requests that need authentication
           if (_needsAuthentication(options.path)) {
-            Logger.debug('Adding auth to request: ${options.path}');
-            final token = await _getAuthToken();
-            if (token != null) {
-              options.headers['Authorization'] = 'Bearer $token';
-              Logger.success('Auth header added');
-            } else {
-              Logger.warning('No auth token found');
+            try {
+              final token = await _getAuthToken();
+              if (token != null) {
+                options.headers['Authorization'] = 'Bearer $token';
+              }
+            } catch (e) {
+              // Silently fail for auth token retrieval to avoid blocking requests
+              Logger.error('Error getting auth token: $e');
             }
           }
           handler.next(options);
@@ -188,13 +195,8 @@ class ApiService {
   Future<String?> _getAuthToken() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString(AppConstants.tokenKey);
-      Logger.debug(
-        'Auth token: ${token != null ? 'Found (${token.substring(0, 20)}...)' : 'Not found'}',
-      );
-      return token;
+      return prefs.getString(AppConstants.tokenKey);
     } catch (e) {
-      Logger.error('Error getting auth token: $e');
       return null;
     }
   }
