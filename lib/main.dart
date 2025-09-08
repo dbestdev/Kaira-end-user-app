@@ -36,6 +36,8 @@ import 'features/chat/presentation/pages/chat_page.dart';
 import 'features/home/presentation/pages/notifications_screen.dart';
 import 'features/services/presentation/pages/all_services_page.dart';
 import 'features/wallet/presentation/pages/wallet_page.dart';
+import 'features/home/presentation/pages/map_test_page.dart';
+import 'features/settings/presentation/pages/settings_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -129,9 +131,9 @@ class KairaApp extends StatelessWidget {
         },
         '/edit-profile': (context) {
           final args =
-              ModalRoute.of(context)!.settings.arguments
-                  as Map<String, dynamic>;
-          return EditProfilePage(userData: args['userData']);
+              ModalRoute.of(context)?.settings.arguments
+                  as Map<String, dynamic>?;
+          return EditProfilePage(userData: args?['userData']);
         },
         '/change-email': (context) {
           final args =
@@ -213,6 +215,12 @@ class KairaApp extends StatelessWidget {
         },
         '/wallet': (context) {
           return const WalletPage();
+        },
+        '/map-test': (context) {
+          return const MapTestPage();
+        },
+        '/settings': (context) {
+          return const SettingsPage();
         },
       },
     );

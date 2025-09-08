@@ -1,5 +1,6 @@
 class MapsConstants {
-  // Google Maps API Key
+  // Google Maps API Key - Replace with your actual API key
+  // Get your API key from: https://console.cloud.google.com/
   static const String apiKey = 'AIzaSyAIY1NjFtDZiHfsNcWT-viJQotsyh01I5E';
 
   // Map Configuration

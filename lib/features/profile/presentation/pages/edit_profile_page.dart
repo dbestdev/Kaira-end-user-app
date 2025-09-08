@@ -8,9 +8,9 @@ import 'dart:io';
 import 'dart:convert';
 
 class EditProfilePage extends StatefulWidget {
-  final Map<String, dynamic> userData;
+  final Map<String, dynamic>? userData;
 
-  const EditProfilePage({super.key, required this.userData});
+  const EditProfilePage({super.key, this.userData});
 
   @override
   State<EditProfilePage> createState() => _EditProfilePageState();
@@ -33,11 +33,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   void _initializeFields() {
-    _firstNameController.text = widget.userData['firstName'] ?? '';
-    _lastNameController.text = widget.userData['lastName'] ?? '';
-    _emailController.text = widget.userData['email'] ?? '';
+    final userData = widget.userData ?? {};
+    _firstNameController.text = userData['firstName'] ?? '';
+    _lastNameController.text = userData['lastName'] ?? '';
+    _emailController.text = userData['email'] ?? '';
     _phoneController.text = PhoneUtils.formatForDisplay(
-      widget.userData['phoneNumber'] ?? '',
+      userData['phoneNumber'] ?? '',
     );
   }
 
@@ -304,9 +305,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
                         height: 120,
                         fit: BoxFit.cover,
                       )
-                    : widget.userData['profilePicture'] != null
+                    : (widget.userData?['profilePicture'] != null)
                     ? Image.network(
-                        widget.userData['profilePicture'],
+                        widget.userData!['profilePicture'],
                         width: 120,
                         height: 120,
                         fit: BoxFit.cover,

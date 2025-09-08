@@ -277,12 +277,32 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     );
   }
 
-  void _showComingSoon(String feature) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('$feature is coming soon'),
-        duration: const Duration(seconds: 2),
-      ),
+  void _showSignOutDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Sign Out'),
+          content: const Text('Are you sure you want to sign out?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                // TODO: Implement actual sign out logic
+                Navigator.of(context).pushReplacementNamed('/login');
+              },
+              child: const Text(
+                'Sign Out',
+                style: TextStyle(color: Colors.red),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -481,11 +501,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   // Navigate to profile page
   void _navigateToProfile() {
-    Navigator.pushNamed(
-      context,
-      '/profile',
-      arguments: {'userData': _currentUser},
-    );
+    Navigator.pop(context); // Close drawer
+    setState(() => _currentIndex = 2); // Switch to Profile tab
   }
 
   void _onMapCreated(GoogleMapController controller) {
@@ -1621,7 +1638,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         color: const Color(0xFF9C27B0),
                         onTap: () {
                           Navigator.pop(context);
-                          _showComingSoon('Support');
+                          Navigator.pushNamed(context, '/contact-support');
                         },
                       ),
                       _buildDrawerItem(
@@ -1631,7 +1648,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         color: Colors.grey.shade700,
                         onTap: () {
                           Navigator.pop(context);
-                          _showComingSoon('About');
+                          Navigator.pushNamed(context, '/about-kaira');
                         },
                       ),
                       const SizedBox(height: 8),
@@ -1652,7 +1669,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         color: Colors.grey.shade800,
                         onTap: () {
                           Navigator.pop(context);
-                          _showComingSoon('Settings');
+                          Navigator.pushNamed(context, '/settings');
                         },
                       ),
                       _buildDrawerItem(
@@ -1662,7 +1679,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                         color: Colors.red.shade600,
                         onTap: () {
                           Navigator.pop(context);
-                          _showComingSoon('Sign Out');
+                          _showSignOutDialog();
                         },
                       ),
                     ],
@@ -2981,48 +2998,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           ),
         ),
       ),
-    );
-  }
-
-  void _showSignOutDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Row(
-            children: [
-              Icon(Icons.logout, color: Color(0xFFFF9800)),
-              SizedBox(width: 12),
-              Text('Sign Out'),
-            ],
-          ),
-          content: const Text(
-            'Are you sure you want to sign out of your account?',
-            style: TextStyle(fontSize: 16),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                // TODO: Implement sign out logic
-                // Clear user data, navigate to login, etc.
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF9800),
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Sign Out'),
-            ),
-          ],
-        );
-      },
     );
   }
 

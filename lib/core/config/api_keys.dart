@@ -6,7 +6,8 @@ class ApiKeys {
   // Google Places API Key
   // TODO: Move this to environment variables or secure storage
   // For now, this is a placeholder - replace with your actual API key
-  static const String googlePlacesApiKey = 'YOUR_GOOGLE_PLACES_API_KEY_HERE';
+  static const String googlePlacesApiKey =
+      'AIzaSyCjvdD8hCL6QvuGqbDJgCH9v_qvIdVObu0';
 
   // Other API keys can be added here
   // static const String mapboxApiKey = 'YOUR_MAPBOX_API_KEY_HERE';

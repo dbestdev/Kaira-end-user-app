@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:shimmer/shimmer.dart';
 import '../../../../core/models/notification_model.dart';
 import '../../../../core/services/notifications_service.dart';
 
@@ -419,23 +420,26 @@ class _NotificationsScreenState extends State<NotificationsScreen>
             Tab(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Unread'),
+                  const Flexible(
+                    child: Text('Unread', overflow: TextOverflow.ellipsis),
+                  ),
                   if (_stats?.unread != null && _stats!.unread > 0) ...[
                     const SizedBox(width: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
+                        horizontal: 4,
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
                         color: Colors.red.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         '${_stats!.unread}',
                         style: const TextStyle(
-                          fontSize: 10,
+                          fontSize: 9,
                           fontWeight: FontWeight.bold,
                           color: Colors.red,
                         ),
@@ -448,23 +452,26 @@ class _NotificationsScreenState extends State<NotificationsScreen>
             Tab(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Read'),
+                  const Flexible(
+                    child: Text('Read', overflow: TextOverflow.ellipsis),
+                  ),
                   if (_stats?.read != null) ...[
                     const SizedBox(width: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
+                        horizontal: 4,
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
                         color: Colors.green.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         '${_stats!.read}',
                         style: const TextStyle(
-                          fontSize: 10,
+                          fontSize: 9,
                           fontWeight: FontWeight.bold,
                           color: Colors.green,
                         ),
@@ -477,23 +484,26 @@ class _NotificationsScreenState extends State<NotificationsScreen>
             Tab(
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text('Archived'),
+                  const Flexible(
+                    child: Text('Archived', overflow: TextOverflow.ellipsis),
+                  ),
                   if (_stats?.archived != null && _stats!.archived > 0) ...[
                     const SizedBox(width: 4),
                     Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 6,
+                        horizontal: 4,
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
                         color: Colors.grey.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         '${_stats!.archived}',
                         style: const TextStyle(
-                          fontSize: 10,
+                          fontSize: 9,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
@@ -510,13 +520,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
 
   Widget _buildNotificationsList() {
     if (_isLoading) {
-      return const SliverFillRemaining(
-        child: Center(
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2196F3)),
-          ),
-        ),
-      );
+      return _buildShimmerLoading();
     }
 
     if (_notifications.isEmpty) {
@@ -567,6 +571,95 @@ class _NotificationsScreenState extends State<NotificationsScreen>
         }
         return null;
       }, childCount: _notifications.length + (_hasMoreData ? 1 : 0)),
+    );
+  }
+
+  Widget _buildShimmerLoading() {
+    return SliverFillRemaining(
+      child: Shimmer.fromColors(
+        baseColor: Colors.grey.shade300,
+        highlightColor: Colors.grey.shade100,
+        child: ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: 6, // Show 6 shimmer items
+          itemBuilder: (context, index) => _buildShimmerNotificationItem(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildShimmerNotificationItem() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Icon shimmer
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(24),
+            ),
+          ),
+          const SizedBox(width: 16),
+          // Content shimmer
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  height: 16,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  height: 14,
+                  width: 200,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Container(
+                  height: 12,
+                  width: 100,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Time shimmer
+          Container(
+            height: 12,
+            width: 60,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

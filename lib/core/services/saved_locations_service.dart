@@ -83,7 +83,7 @@ class SavedLocationsService {
   /// Set a location as default
   Future<SavedLocationModel> setDefaultLocation(String id) async {
     try {
-      final data = await _apiService.put(
+      final data = await _apiService.patch(
         '/saved-locations/$id/set-default',
         {},
       );

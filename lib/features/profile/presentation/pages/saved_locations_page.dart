@@ -4,9 +4,11 @@ import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:google_places_autocomplete_text_field/google_places_autocomplete_text_field.dart';
+import 'package:shimmer/shimmer.dart';
 import '../../../../core/models/saved_location_model.dart';
 import '../../../../core/services/saved_locations_service.dart';
 import '../../../../core/services/google_places_service.dart';
+import '../../../../core/config/api_keys.dart';
 
 class SavedLocationsPage extends StatefulWidget {
   const SavedLocationsPage({super.key});
@@ -113,14 +115,7 @@ class _SavedLocationsPageState extends State<SavedLocationsPage> {
 
   Widget _buildContent() {
     if (_isLoading) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(32),
-          child: CircularProgressIndicator(
-            valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2196F3)),
-          ),
-        ),
-      );
+      return _buildShimmerLoading();
     }
 
     if (_error != null) {
@@ -132,6 +127,100 @@ class _SavedLocationsPageState extends State<SavedLocationsPage> {
     }
 
     return _buildLocationsList();
+  }
+
+  Widget _buildShimmerLoading() {
+    return Shimmer.fromColors(
+      baseColor: Colors.grey.shade300,
+      highlightColor: Colors.grey.shade100,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header shimmer
+          Container(
+            height: 24,
+            width: 200,
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Location cards shimmer
+          ...List.generate(3, (index) => _buildShimmerLocationCard()),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildShimmerLocationCard() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          children: [
+            // Icon shimmer
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+            const SizedBox(width: 16),
+            // Content shimmer
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    height: 16,
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Container(
+                    height: 14,
+                    width: 200,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Container(
+                    height: 14,
+                    width: 150,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            // Menu shimmer
+            Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildEmptyState() {
@@ -585,9 +674,15 @@ class _SavedLocationsPageState extends State<SavedLocationsPage> {
   }
 
   void _addLocationFromPlace(GooglePlace place) async {
+    print(
+      '_addLocationFromPlace called with: ${place.placeId} - ${place.name}',
+    );
+
     // If coordinates are not available, fetch them
     if (place.latitude == 0.0 && place.longitude == 0.0) {
       try {
+        print('Fetching place details for placeId: ${place.placeId}');
+
         // Show loading dialog
         showDialog(
           context: context,
@@ -604,6 +699,10 @@ class _SavedLocationsPageState extends State<SavedLocationsPage> {
           place.placeId,
         );
 
+        print(
+          'Place details fetched: ${placeDetails.latitude}, ${placeDetails.longitude}',
+        );
+
         Navigator.pop(context); // Close loading dialog
 
         _showLocationNameDialog(
@@ -613,10 +712,14 @@ class _SavedLocationsPageState extends State<SavedLocationsPage> {
           placeId: placeDetails.placeId,
         );
       } catch (e) {
+        print('Error fetching place details: $e');
         Navigator.pop(context); // Close loading dialog
         _showErrorSnackBar('Error getting place details: $e');
       }
     } else {
+      print(
+        'Using provided coordinates: ${place.latitude}, ${place.longitude}',
+      );
       _showLocationNameDialog(
         address: place.address,
         latitude: place.latitude,
@@ -735,10 +838,13 @@ class _SavedLocationsPageState extends State<SavedLocationsPage> {
 
   void _setAsDefault(SavedLocationModel location) async {
     try {
+      print('Setting location as default: ${location.id} - ${location.name}');
       await _savedLocationsService.setDefaultLocation(location.id);
+      print('Successfully set location as default');
       _showSuccessSnackBar('Default location updated!');
       _loadSavedLocations(); // Refresh the list
     } catch (e) {
+      print('Error setting default location: $e');
       _showErrorSnackBar('Error setting default location: $e');
     }
   }
@@ -867,10 +973,14 @@ class _GooglePlacesSearchPage extends StatefulWidget {
 
 class _GooglePlacesSearchPageState extends State<_GooglePlacesSearchPage> {
   final TextEditingController _searchController = TextEditingController();
+  bool _disposed = false;
 
   @override
   void dispose() {
-    _searchController.dispose();
+    if (!_disposed) {
+      _searchController.dispose();
+      _disposed = true;
+    }
     super.dispose();
   }
 
@@ -932,8 +1042,8 @@ class _GooglePlacesSearchPageState extends State<_GooglePlacesSearchPage> {
       ),
       child: GooglePlacesAutoCompleteTextFormField(
         textEditingController: _searchController,
-        config: const GoogleApiConfig(
-          apiKey: 'AIzaSyCjvdD8hCL6QvuGqbDJgCH9v_qvIdVObu0',
+        config: GoogleApiConfig(
+          apiKey: ApiKeys.googlePlacesApiKey,
           countries: ['ng'], // Nigeria
           fetchPlaceDetailsWithCoordinates: true,
           debounceTime: 400,
@@ -982,21 +1092,38 @@ class _GooglePlacesSearchPageState extends State<_GooglePlacesSearchPage> {
   }
 
   void _handlePlaceSelection(dynamic prediction) {
-    // Create a GooglePlace from the prediction
-    final googlePlace = GooglePlace(
-      placeId: prediction.placeId ?? '',
-      name:
-          prediction.structuredFormatting?.mainText ??
-          prediction.description ??
-          '',
-      address: prediction.description ?? '',
-      latitude: 0.0, // Will be fetched when needed
-      longitude: 0.0, // Will be fetched when needed
-    );
+    try {
+      print('Place selected: ${prediction.toString()}');
 
-    // Call the callback to handle the selection
-    widget.onPlaceSelected(googlePlace);
-    Navigator.pop(context);
+      // Create a GooglePlace from the prediction
+      final googlePlace = GooglePlace(
+        placeId: prediction.placeId ?? '',
+        name:
+            prediction.structuredFormatting?.mainText ??
+            prediction.description ??
+            '',
+        address: prediction.description ?? '',
+        latitude: 0.0, // Will be fetched when needed
+        longitude: 0.0, // Will be fetched when needed
+      );
+
+      print(
+        'Created GooglePlace: ${googlePlace.placeId} - ${googlePlace.name}',
+      );
+
+      // Call the callback to handle the selection
+      widget.onPlaceSelected(googlePlace);
+      Navigator.pop(context);
+    } catch (e) {
+      print('Error handling place selection: $e');
+      // Show error to user
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error selecting place: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 
   Widget _buildEmptyState() {
@@ -1119,6 +1246,7 @@ class _LocationNameDialogState extends State<_LocationNameDialog> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
+  bool _disposed = false;
 
   @override
   void initState() {
@@ -1129,8 +1257,11 @@ class _LocationNameDialogState extends State<_LocationNameDialog> {
 
   @override
   void dispose() {
-    _nameController.dispose();
-    _descriptionController.dispose();
+    if (!_disposed) {
+      _nameController.dispose();
+      _descriptionController.dispose();
+      _disposed = true;
+    }
     super.dispose();
   }
 
