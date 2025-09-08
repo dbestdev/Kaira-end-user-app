@@ -272,7 +272,7 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
       }
 
       // Complete signup with email verification
-      await _authService.verifyEmailOtp(
+      final response = await _authService.verifyEmailOtp(
         email: widget.email,
         otpCode: emailOtp,
         signUpData: widget.signUpData,
@@ -282,13 +282,14 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
         setState(() {
           _isEmailOtpVerified = true;
           _isLoading = false;
-          
+
           // Check if account already exists
           final data = response['data'];
           if (data != null && data['accountExists'] == true) {
             _successMessage = 'Account already exists! You can now login.';
           } else {
-            _successMessage = 'Account created successfully! Welcome to Kaira! 🎉';
+            _successMessage =
+                'Account created successfully! Welcome to Kaira! 🎉';
           }
         });
 
@@ -315,7 +316,8 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
         // Show user-friendly error message
         String errorMessage = 'Email verification failed';
         if (e.toString().contains('No pending Email OTP found')) {
-          errorMessage = 'No pending email verification found. Please request a new OTP.';
+          errorMessage =
+              'No pending email verification found. Please request a new OTP.';
         } else if (e.toString().contains('Invalid OTP') ||
             e.toString().contains('OTP expired')) {
           errorMessage =
