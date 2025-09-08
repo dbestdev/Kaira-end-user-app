@@ -19,6 +19,7 @@ class AppConstants {
   // Storage Keys
   static const String tokenKey = 'auth_token';
   static const String userKey = 'user_data';
+  static const String isLoggedInKey = 'isLoggedIn';
   static const String themeKey = 'app_theme';
   static const String languageKey = 'app_language';
   static const String locationKey = 'user_location';

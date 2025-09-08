@@ -4,6 +4,7 @@ import 'package:pinput/pinput.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../../../../core/providers/auth_provider.dart';
+import '../../../../core/providers/user_provider.dart';
 
 class OtpVerificationPageRiverpod extends ConsumerStatefulWidget {
   final String phoneNumber;
@@ -36,7 +37,6 @@ class _OtpVerificationPageRiverpodState
   bool _isSmsOtpVerified = false;
   bool _isEmailOtpVerified = false;
   String? _successMessage;
-  String? _errorMessage;
 
   // SMS OTP timer
   int _smsResendSeconds = 0;
@@ -108,10 +108,9 @@ class _OtpVerificationPageRiverpodState
       return;
     }
 
-    await ref.read(authStateProvider.notifier).verifySmsOtp(
-      phoneNumber: widget.phoneNumber,
-      otpCode: smsOtp,
-    );
+    await ref
+        .read(authStateProvider.notifier)
+        .verifySmsOtp(phoneNumber: widget.phoneNumber, otpCode: smsOtp);
 
     final authState = ref.read(authStateProvider);
     if (authState.error != null) {
@@ -139,11 +138,13 @@ class _OtpVerificationPageRiverpodState
       return;
     }
 
-    await ref.read(authStateProvider.notifier).verifyEmailOtp(
-      email: widget.email,
-      otpCode: emailOtp,
-      signUpData: widget.signUpData,
-    );
+    await ref
+        .read(authStateProvider.notifier)
+        .verifyEmailOtp(
+          email: widget.email,
+          otpCode: emailOtp,
+          signUpData: widget.signUpData,
+        );
 
     final authState = ref.read(authStateProvider);
     if (authState.error != null) {
@@ -155,7 +156,7 @@ class _OtpVerificationPageRiverpodState
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('isLoggedIn', true);
         await prefs.setString('userData', jsonEncode(userData));
-        
+
         // Update user data provider
         await ref.read(userDataProvider.notifier).updateUserData(userData);
       }
@@ -173,9 +174,6 @@ class _OtpVerificationPageRiverpodState
   }
 
   void _showError(String message) {
-    setState(() {
-      _errorMessage = message;
-    });
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
@@ -222,16 +220,16 @@ class _OtpVerificationPageRiverpodState
               Text(
                 'Verify Your Account',
                 style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
                 'We\'ve sent verification codes to your phone and email',
-                style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: Colors.grey[600],
-                    ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(color: Colors.grey[600]),
               ),
               const SizedBox(height: 40),
 
@@ -262,15 +260,15 @@ class _OtpVerificationPageRiverpodState
               // SMS OTP Section
               _buildOtpSection(
                 title: 'SMS Verification',
-                subtitle: 'Enter the 6-digit code sent to ${widget.phoneNumber}',
+                subtitle:
+                    'Enter the 6-digit code sent to ${widget.phoneNumber}',
                 controllers: _smsOtpControllers,
                 isVerified: _isSmsOtpVerified,
                 onVerify: _verifySmsOtp,
                 onResend: () async {
-                  await ref.read(authStateProvider.notifier).sendOtp(
-                    identifier: widget.phoneNumber,
-                    type: 'sms',
-                  );
+                  await ref
+                      .read(authStateProvider.notifier)
+                      .sendOtp(identifier: widget.phoneNumber, type: 'sms');
                   _startSmsResendTimer();
                   _clearSmsOtpFields();
                 },
@@ -290,10 +288,9 @@ class _OtpVerificationPageRiverpodState
                   isVerified: _isEmailOtpVerified,
                   onVerify: _verifyEmailOtp,
                   onResend: () async {
-                    await ref.read(authStateProvider.notifier).sendOtp(
-                      identifier: widget.email,
-                      type: 'email',
-                    );
+                    await ref
+                        .read(authStateProvider.notifier)
+                        .sendOtp(identifier: widget.email, type: 'email');
                     _clearEmailOtpFields();
                   },
                   canResend: true,
@@ -333,21 +330,11 @@ class _OtpVerificationPageRiverpodState
             ),
             const SizedBox(width: 8),
             if (isVerified)
-              const Icon(
-                Icons.check_circle,
-                color: Colors.green,
-                size: 20,
-              ),
+              const Icon(Icons.check_circle, color: Colors.green, size: 20),
           ],
         ),
         const SizedBox(height: 8),
-        Text(
-          subtitle,
-          style: TextStyle(
-            fontSize: 14,
-            color: Colors.grey[600],
-          ),
-        ),
+        Text(subtitle, style: TextStyle(fontSize: 14, color: Colors.grey[600])),
         const SizedBox(height: 20),
 
         // OTP Input Fields
@@ -432,9 +419,7 @@ class _OtpVerificationPageRiverpodState
           child: TextButton(
             onPressed: canResend ? onResend : null,
             child: Text(
-              canResend
-                  ? 'Resend Code'
-                  : 'Resend in ${resendSeconds}s',
+              canResend ? 'Resend Code' : 'Resend in ${resendSeconds}s',
               style: TextStyle(
                 color: canResend ? Colors.blue : Colors.grey,
                 fontWeight: FontWeight.w500,

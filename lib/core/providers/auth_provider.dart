@@ -14,12 +14,15 @@ final authServiceProvider = Provider<AuthService>((ref) {
 
 // Auth State Provider
 class AuthStateNotifier extends StateNotifier<AuthStateData> {
-  AuthStateNotifier() : super(const AuthStateData(
-    isLoading: false,
-    isAuthenticated: false,
-    user: null,
-    error: null,
-  ));
+  AuthStateNotifier()
+    : super(
+        const AuthStateData(
+          isLoading: false,
+          isAuthenticated: false,
+          user: null,
+          error: null,
+        ),
+      );
 
   final AuthService _authService = AuthService();
 
@@ -29,13 +32,13 @@ class AuthStateNotifier extends StateNotifier<AuthStateData> {
     required String password,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
-    
+
     try {
       final response = await _authService.login(
         identifier: identifier,
         password: password,
       );
-      
+
       if (response['success'] == true) {
         final userData = response['data']['user'];
         state = state.copyWith(
@@ -51,10 +54,7 @@ class AuthStateNotifier extends StateNotifier<AuthStateData> {
         );
       }
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
@@ -67,7 +67,7 @@ class AuthStateNotifier extends StateNotifier<AuthStateData> {
     required String password,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
-    
+
     try {
       final response = await _authService.initiateSignup(
         firstName: firstName,
@@ -75,13 +75,11 @@ class AuthStateNotifier extends StateNotifier<AuthStateData> {
         email: email,
         phoneNumber: phoneNumber,
         password: password,
+        confirmPassword: password,
       );
-      
+
       if (response['success'] == true) {
-        state = state.copyWith(
-          isLoading: false,
-          error: null,
-        );
+        state = state.copyWith(isLoading: false, error: null);
       } else {
         state = state.copyWith(
           isLoading: false,
@@ -89,10 +87,7 @@ class AuthStateNotifier extends StateNotifier<AuthStateData> {
         );
       }
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
@@ -102,19 +97,16 @@ class AuthStateNotifier extends StateNotifier<AuthStateData> {
     required String otpCode,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
-    
+
     try {
       final response = await _authService.verifyOtp(
         identifier: phoneNumber,
         type: 'sms',
         code: otpCode,
       );
-      
+
       if (response['success'] == true) {
-        state = state.copyWith(
-          isLoading: false,
-          error: null,
-        );
+        state = state.copyWith(isLoading: false, error: null);
       } else {
         state = state.copyWith(
           isLoading: false,
@@ -122,10 +114,7 @@ class AuthStateNotifier extends StateNotifier<AuthStateData> {
         );
       }
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
@@ -136,14 +125,14 @@ class AuthStateNotifier extends StateNotifier<AuthStateData> {
     required Map<String, dynamic> signUpData,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
-    
+
     try {
       final response = await _authService.verifyEmailOtp(
         email: email,
         otpCode: otpCode,
         signUpData: signUpData,
       );
-      
+
       if (response['success'] == true) {
         final userData = response['data']?['user'];
         state = state.copyWith(
@@ -159,10 +148,7 @@ class AuthStateNotifier extends StateNotifier<AuthStateData> {
         );
       }
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
@@ -172,18 +158,15 @@ class AuthStateNotifier extends StateNotifier<AuthStateData> {
     required String type,
   }) async {
     state = state.copyWith(isLoading: true, error: null);
-    
+
     try {
       final response = await _authService.sendOtp(
         identifier: identifier,
         type: type,
       );
-      
+
       if (response['success'] == true) {
-        state = state.copyWith(
-          isLoading: false,
-          error: null,
-        );
+        state = state.copyWith(isLoading: false, error: null);
       } else {
         state = state.copyWith(
           isLoading: false,
@@ -191,20 +174,17 @@ class AuthStateNotifier extends StateNotifier<AuthStateData> {
         );
       }
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
   // Logout
   Future<void> logout() async {
     state = state.copyWith(isLoading: true, error: null);
-    
+
     try {
-      await _authService.logout();
-      
+      await _authService.logout('');
+
       state = state.copyWith(
         isLoading: false,
         isAuthenticated: false,
@@ -212,10 +192,7 @@ class AuthStateNotifier extends StateNotifier<AuthStateData> {
         error: null,
       );
     } catch (e) {
-      state = state.copyWith(
-        isLoading: false,
-        error: e.toString(),
-      );
+      state = state.copyWith(isLoading: false, error: e.toString());
     }
   }
 
@@ -226,9 +203,10 @@ class AuthStateNotifier extends StateNotifier<AuthStateData> {
 }
 
 // Auth State Provider
-final authStateProvider = StateNotifierProvider<AuthStateNotifier, AuthStateData>((ref) {
-  return AuthStateNotifier();
-});
+final authStateProvider =
+    StateNotifierProvider<AuthStateNotifier, AuthStateData>((ref) {
+      return AuthStateNotifier();
+    });
 
 // Auth State Data Class
 class AuthStateData {

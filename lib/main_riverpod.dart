@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'core/constants/app_constants.dart';
-import 'core/widgets/splash_screen.dart';
 import 'features/auth/presentation/pages/login_page.dart';
 import 'features/auth/presentation/pages/onboarding_page.dart';
 import 'features/auth/presentation/pages/otp_verification_page_riverpod.dart';
@@ -17,12 +16,8 @@ import 'features/home/presentation/pages/map_test_page.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  runApp(
-    const ProviderScope(
-      child: KairaApp(),
-    ),
-  );
+
+  runApp(const ProviderScope(child: KairaApp()));
 }
 
 class KairaApp extends ConsumerWidget {
@@ -42,9 +37,11 @@ class KairaApp extends ConsumerWidget {
       routes: {
         '/onboarding': (context) => const OnboardingPage(),
         '/login': (context) => const LoginPage(),
-        '/signup': (context) => const SignupPage(),
+        '/signup': (context) => const SignUpPage(),
         '/otp-verification': (context) {
-          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          final args =
+              ModalRoute.of(context)?.settings.arguments
+                  as Map<String, dynamic>?;
           return OtpVerificationPageRiverpod(
             phoneNumber: args?['phoneNumber'] ?? '',
             email: args?['email'] ?? '',
@@ -54,7 +51,9 @@ class KairaApp extends ConsumerWidget {
         '/home': (context) => const HomePage(),
         '/notifications': (context) => const NotificationsScreen(),
         '/edit-profile': (context) {
-          final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+          final args =
+              ModalRoute.of(context)?.settings.arguments
+                  as Map<String, dynamic>?;
           return EditProfilePage(userData: args?['userData']);
         },
         '/saved-locations': (context) => const SavedLocationsPage(),
@@ -81,11 +80,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   Future<void> _checkAuthStatus() async {
     await Future.delayed(const Duration(seconds: 2));
-    
+
     if (mounted) {
       final prefs = await SharedPreferences.getInstance();
       final isLoggedIn = prefs.getBool(AppConstants.isLoggedInKey) ?? false;
-      
+
       if (isLoggedIn) {
         Navigator.pushReplacementNamed(context, '/home');
       } else {
@@ -109,11 +108,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(20),
               ),
-              child: const Icon(
-                Icons.build,
-                size: 60,
-                color: Colors.blue,
-              ),
+              child: const Icon(Icons.build, size: 60, color: Colors.blue),
             ),
             const SizedBox(height: 24),
             const Text(
@@ -127,15 +122,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             const SizedBox(height: 8),
             const Text(
               'Your Service Platform',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.white70,
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.white70),
             ),
             const SizedBox(height: 40),
-            const CircularProgressIndicator(
-              color: Colors.white,
-            ),
+            const CircularProgressIndicator(color: Colors.white),
           ],
         ),
       ),

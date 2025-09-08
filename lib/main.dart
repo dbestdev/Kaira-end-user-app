@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
-import 'core/di/injection.dart';
-import 'core/services/storage_service.dart';
+// import 'core/di/injection.dart'; // Removed - using Riverpod now
+// import 'core/services/storage_service.dart'; // Removed - using Riverpod now
 import 'core/widgets/splash_screen.dart';
 import 'features/auth/presentation/pages/onboarding_page.dart';
 import 'features/auth/presentation/pages/login_page.dart';
@@ -45,12 +45,12 @@ void main() async {
   // Environment is now controlled by AppModeConfig.currentMode
   // To switch modes, edit lib/core/config/app_mode.dart
 
-  // Initialize dependencies
-  await configureDependencies();
+  // Initialize dependencies - using Riverpod now
+  // await configureDependencies(); // Removed - using Riverpod now
 
-  // Initialize storage service
-  final storageService = getIt<StorageService>();
-  await storageService.initialize();
+  // Initialize storage service - using Riverpod now
+  // final storageService = getIt<StorageService>(); // Removed - using Riverpod now
+  // await storageService.initialize(); // Removed - using Riverpod now
 
   runApp(const KairaApp());
 }
