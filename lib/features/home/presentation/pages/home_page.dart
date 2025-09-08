@@ -377,85 +377,24 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     _loadNotificationStats();
   }
 
-  // Load user data from server
+  // Load user data from local storage first, then server
   Future<void> _loadUserData() async {
     try {
       print('🔄 Loading user data...');
 
-      // Try to get user profile from server first
-      try {
-        print('📡 Calling getUserProfile API...');
-        final userProfile = await _userService.getUserProfile();
-        print('✅ API Response: $userProfile');
-
-        // Update current user data with server data
-        // The backend returns: { success: true, message: "...", data: { user: { ... } } }
-        final userData = userProfile['data']?['user'] ?? userProfile;
-        print('👤 Extracted user data: $userData');
-
-        setState(() {
-          _currentUser = {
-            'name':
-                '${userData['firstName'] ?? ''} ${userData['lastName'] ?? ''}'
-                    .trim(),
-            'email': userData['email'] ?? '',
-            'phoneNumber': userData['phoneNumber'] ?? '',
-            'firstName': userData['firstName'],
-            'lastName': userData['lastName'],
-            'createdAt': userData['createdAt'],
-            'isVerified': userData['isVerified'],
-            // Fields now returned by backend
-            'rating': (userData['rating'] ?? 0.0).toDouble(),
-            'reviewsCount': userData['reviewsCount'] ?? 0,
-            'profilePicture': userData['profilePicture'],
-
-            // Wallet object from backend
-            'wallet':
-                userData['wallet'] ??
-                {
-                  'balance': 0.0,
-                  'currency': 'NGN',
-                  'fundingHistory': [],
-                  'withdrawalHistory': [],
-                  'transactionHistory': [],
-                  'lastTransactionDate': null,
-                  'totalFunded': 0.0,
-                  'totalWithdrawn': 0.0,
-                  'isActive': true,
-                },
-
-            // Bookings object from backend
-            'bookings':
-                userData['bookings'] ??
-                {
-                  'totalBookings': 0,
-                  'completedBookings': 0,
-                  'pendingBookings': 0,
-                  'activeBookings': 0,
-                  'cancelledBookings': 0,
-                  'upcomingBookings': 0,
-                  'totalSpent': 0.0,
-                  'averageBookingValue': 0.0,
-                  'lastBookingDate': null,
-                  'favoriteServices': [],
-                  'bookingHistory': [],
-                },
-
-            // Legacy fields for backward compatibility (extracted from objects)
-            'walletBalance': (userData['wallet']?['balance'] ?? 0.0).toDouble(),
-            'totalBookings': userData['bookings']?['totalBookings'] ?? 0,
-            'completedBookings':
-                userData['bookings']?['completedBookings'] ?? 0,
-            'totalSpent': (userData['bookings']?['totalSpent'] ?? 0.0)
-                .toDouble(),
-          };
-        });
-        print('✅ Updated _currentUser: $_currentUser');
-      } catch (serverError) {
-        print('❌ Server error, trying local data: $serverError');
-
-        // Fallback to local stored data
-        await _loadLocalUserData();
+      // First, try to load from local storage (this is the correct user data)
+      await _loadLocalUserData();
+      
+      // If we have local data, use it and optionally sync with server in background
+      if (_currentUser['email'] != null && _currentUser['email'].isNotEmpty) {
+        print('✅ Using local user data: ${_currentUser['email']}');
+        
+        // Optionally sync with server in background (don't wait for it)
+        _syncWithServerInBackground();
+      } else {
+        print('❌ No local user data, trying server...');
+        // Only call server if no local data
+        await _loadFromServer();
       }
     } catch (e) {
       print('❌ Error loading user data: $e');
@@ -463,6 +402,91 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     } finally {
       print('🏁 User data loading complete');
     }
+  }
+
+  // Load user data from server
+  Future<void> _loadFromServer() async {
+    try {
+      print('📡 Calling getUserProfile API...');
+      final userProfile = await _userService.getUserProfile();
+      print('✅ API Response: $userProfile');
+
+      // Update current user data with server data
+      final userData = userProfile['data']?['user'] ?? userProfile;
+      print('👤 Extracted user data: $userData');
+
+      setState(() {
+        _currentUser = _buildUserDataFromResponse(userData);
+      });
+      print('✅ Updated _currentUser from server: $_currentUser');
+    } catch (serverError) {
+      print('❌ Server error: $serverError');
+      // Keep existing data if server fails
+    }
+  }
+
+  // Sync with server in background (non-blocking)
+  Future<void> _syncWithServerInBackground() async {
+    try {
+      print('🔄 Syncing with server in background...');
+      final userProfile = await _userService.getUserProfile();
+      final userData = userProfile['data']?['user'] ?? userProfile;
+      
+      // Only update if we got valid data
+      if (userData['email'] != null && userData['email'].isNotEmpty) {
+        setState(() {
+          _currentUser = _buildUserDataFromResponse(userData);
+        });
+        print('✅ Background sync completed: ${userData['email']}');
+      }
+    } catch (e) {
+      print('❌ Background sync failed: $e');
+      // Don't update UI if sync fails
+    }
+  }
+
+  // Build user data from API response
+  Map<String, dynamic> _buildUserDataFromResponse(Map<String, dynamic> userData) {
+    return {
+      'name': '${userData['firstName'] ?? ''} ${userData['lastName'] ?? ''}'.trim(),
+      'email': userData['email'] ?? '',
+      'phoneNumber': userData['phoneNumber'] ?? '',
+      'firstName': userData['firstName'],
+      'lastName': userData['lastName'],
+      'createdAt': userData['createdAt'],
+      'isVerified': userData['isVerified'],
+      'rating': (userData['rating'] ?? 0.0).toDouble(),
+      'reviewsCount': userData['reviewsCount'] ?? 0,
+      'profilePicture': userData['profilePicture'],
+      'wallet': userData['wallet'] ?? {
+        'balance': 0.0,
+        'currency': 'NGN',
+        'fundingHistory': [],
+        'withdrawalHistory': [],
+        'transactionHistory': [],
+        'lastTransactionDate': null,
+        'totalFunded': 0.0,
+        'totalWithdrawn': 0.0,
+        'isActive': true,
+      },
+      'bookings': userData['bookings'] ?? {
+        'totalBookings': 0,
+        'completedBookings': 0,
+        'pendingBookings': 0,
+        'activeBookings': 0,
+        'cancelledBookings': 0,
+        'upcomingBookings': 0,
+        'totalSpent': 0.0,
+        'averageBookingValue': 0.0,
+        'lastBookingDate': null,
+        'favoriteServices': [],
+        'bookingHistory': [],
+      },
+      'walletBalance': (userData['wallet']?['balance'] ?? 0.0).toDouble(),
+      'totalBookings': userData['bookings']?['totalBookings'] ?? 0,
+      'completedBookings': userData['bookings']?['completedBookings'] ?? 0,
+      'totalSpent': (userData['bookings']?['totalSpent'] ?? 0.0).toDouble(),
+    };
   }
 
   // Load user data from local storage
