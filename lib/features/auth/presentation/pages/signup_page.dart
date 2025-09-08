@@ -585,6 +585,10 @@ class _SignUpPageState extends State<SignUpPage> {
       print('Formatted length: ${formattedPhone.length}');
 
       // Call backend to initiate signup
+      print('🚀 Starting signup process...');
+      print('📧 Email: ${signUpData['email']}');
+      print('📱 Phone: $formattedPhone');
+      
       final authService = AuthService();
       final response = await authService.initiateSignup(
         firstName: signUpData['firstName']!,
@@ -596,8 +600,10 @@ class _SignUpPageState extends State<SignUpPage> {
       );
 
       // Debug: Print the response for troubleshooting
-      print('Signup response: $response');
-      print('OTP sent status: ${response['data']?['otpSent']}');
+      print('✅ Signup response received: $response');
+      print('📊 Success status: ${response['success']}');
+      print('📝 Message: ${response['message']}');
+      print('📱 OTP sent status: ${response['data']?['otpSent']}');
 
       if (mounted) {
         setState(() {
@@ -664,17 +670,20 @@ class _SignUpPageState extends State<SignUpPage> {
             e.toString().contains('Failed to send OTP')) {
           errorMessage =
               'Failed to send verification code. Please check your phone number and try again.';
-        } else if (e.toString().contains(
-              'Phone number is already registered',
-            ) ||
-            e.toString().contains('already registered')) {
-          errorMessage =
-              'This phone number is already registered. Please use a different number or try logging in.';
-        } else if (e.toString().contains(
-          'Email address is already registered',
-        )) {
+        } else if (e.toString().contains('Email address is already registered') ||
+            e.toString().contains('email is already registered') ||
+            e.toString().contains('Email already exists')) {
           errorMessage =
               'This email address is already registered. Please use a different email or try logging in.';
+        } else if (e.toString().contains('Phone number is already registered') ||
+            e.toString().contains('phone number is already registered') ||
+            e.toString().contains('Phone already exists')) {
+          errorMessage =
+              'This phone number is already registered. Please use a different number or try logging in.';
+        } else if (e.toString().contains('already registered') ||
+            e.toString().contains('already exists')) {
+          errorMessage =
+              'This account already exists. Please use different details or try logging in.';
         } else if (e.toString().contains(
           'Please wait before requesting another OTP',
         )) {

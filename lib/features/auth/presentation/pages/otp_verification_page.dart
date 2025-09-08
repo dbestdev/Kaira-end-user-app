@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'dart:async';
+import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/auth_service.dart';
 
@@ -296,9 +297,27 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
         // Set authentication status and navigate to home page after 2 seconds
         Future.delayed(const Duration(seconds: 2), () async {
           if (mounted) {
-            // Set login status
+            // Store user data and authentication status
             final prefs = await SharedPreferences.getInstance();
             await prefs.setBool('isLoggedIn', true);
+
+            // Store user data from the response
+            final data = response['data'];
+            if (data != null && data['user'] != null) {
+              await prefs.setString('userData', jsonEncode(data['user']));
+              print('✅ Stored user data after signup: ${data['user']}');
+
+              // Store auth token if available
+              final accessToken = data['accessToken'];
+              if (accessToken != null) {
+                await prefs.setString('auth_token', accessToken);
+                print(
+                  '✅ Stored access token after signup: ${accessToken.substring(0, 20)}...',
+                );
+              }
+            } else {
+              print('❌ No user data in signup response');
+            }
 
             Navigator.of(context).pushReplacementNamed('/home');
           }

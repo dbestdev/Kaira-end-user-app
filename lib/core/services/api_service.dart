@@ -13,9 +13,9 @@ class ApiService {
     _dio = Dio(
       BaseOptions(
         baseUrl: baseUrl,
-        connectTimeout: const Duration(seconds: 15),
-        receiveTimeout: const Duration(seconds: 30),
-        sendTimeout: const Duration(seconds: 15),
+        connectTimeout: const Duration(seconds: 30),
+        receiveTimeout: const Duration(seconds: 60),
+        sendTimeout: const Duration(seconds: 30),
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -119,12 +119,26 @@ class ApiService {
           return 'Invalid credentials. Please check your email/phone and password.';
         } else if (e.response?.statusCode == 400) {
           final data = e.response?.data;
-          if (data is Map<String, dynamic> && data['message'] != null) {
-            return data['message'];
+          if (data is Map<String, dynamic>) {
+            // Return the exact error message from backend
+            if (data['message'] != null) {
+              return data['message'];
+            }
+            // Check for nested error messages
+            if (data['error'] != null) {
+              return data['error'];
+            }
           }
           return 'Invalid request. Please check your input.';
         } else if (e.response?.statusCode == 404) {
           return 'Service not found. Please try again later.';
+        } else if (e.response?.statusCode == 409) {
+          // Conflict - user already exists
+          final data = e.response?.data;
+          if (data is Map<String, dynamic> && data['message'] != null) {
+            return data['message'];
+          }
+          return 'Account already exists. Please use different details or try logging in.';
         } else if (e.response?.statusCode == 500) {
           return 'Server error. Please try again later.';
         }
