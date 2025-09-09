@@ -191,13 +191,9 @@ class _ForgotPasswordOtpPageState extends State<ForgotPasswordOtpPage>
         // Reset resend timer
         _resetResendTimer();
 
-        // Clear success message after 1 second
-        Future.delayed(const Duration(seconds: 1), () {
-          if (mounted) {
-            setState(() {
-              _successMessage = null;
-            });
-          }
+        // Clear success message immediately
+        setState(() {
+          _successMessage = null;
         });
       }
     } catch (e) {

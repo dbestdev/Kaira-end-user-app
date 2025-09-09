@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-
-// import 'core/di/injection.dart'; // Removed - using Riverpod now
-// import 'core/services/storage_service.dart'; // Removed - using Riverpod now
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/widgets/splash_screen.dart';
 import 'features/auth/presentation/pages/onboarding_page.dart';
 import 'features/auth/presentation/pages/login_page.dart';
@@ -52,14 +50,14 @@ void main() async {
   // final storageService = getIt<StorageService>(); // Removed - using Riverpod now
   // await storageService.initialize(); // Removed - using Riverpod now
 
-  runApp(const KairaApp());
+  runApp(const ProviderScope(child: KairaApp()));
 }
 
-class KairaApp extends StatelessWidget {
+class KairaApp extends ConsumerWidget {
   const KairaApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return MaterialApp(
       title: 'Kaira',
       debugShowCheckedModeBanner: false,

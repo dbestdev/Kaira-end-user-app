@@ -1,7 +1,8 @@
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../constants/app_constants.dart';
+import 'storage_service.dart';
 // import '../utils/logger.dart'; // Removed - using silent error handling
 
 class ApiService {
@@ -9,8 +10,10 @@ class ApiService {
   static String get apiUrl => '$baseUrl/auth';
 
   late final Dio _dio;
+  late final StorageService _storageService;
 
   ApiService() {
+    _storageService = StorageService(FlutterSecureStorage());
     _dio = Dio(
       BaseOptions(
         baseUrl: baseUrl,
@@ -44,13 +47,19 @@ class ApiService {
         onRequest: (options, handler) async {
           // Add auth token to requests that need authentication
           if (_needsAuthentication(options.path)) {
+            print('Adding auth token to request: ${options.path}');
             try {
               final token = await _getAuthToken();
               if (token != null) {
                 options.headers['Authorization'] = 'Bearer $token';
+                print(
+                  'Authorization header added: Bearer ${token.substring(0, 20)}...',
+                );
+              } else {
+                print('No auth token found for request: ${options.path}');
               }
             } catch (e) {
-              // Silently fail for auth token retrieval to avoid blocking requests
+              print('Error adding auth token: $e');
             }
           }
           handler.next(options);
@@ -190,12 +199,16 @@ class ApiService {
     return protectedPaths.any((protectedPath) => path.contains(protectedPath));
   }
 
-  // Get auth token from SharedPreferences
+  // Get auth token from secure storage
   Future<String?> _getAuthToken() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      return prefs.getString(AppConstants.tokenKey);
+      final token = await _storageService.getAuthToken();
+      print(
+        'Retrieved auth token: ${token != null ? '${token.substring(0, 20)}...' : 'null'}',
+      );
+      return token;
     } catch (e) {
+      print('Error retrieving auth token: $e');
       return null;
     }
   }

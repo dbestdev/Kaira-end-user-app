@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../../../../core/services/auth_service.dart';
+import '../../../../core/services/storage_service.dart';
 import '../../../../core/utils/phone_utils.dart';
-
-import '../../../../core/constants/app_constants.dart';
 
 // Custom phone number formatter
 class _PhoneNumberFormatter extends TextInputFormatter {
@@ -154,10 +154,14 @@ class _LoginPageState extends State<LoginPage> {
   }
 
   void _handleLogin() async {
+    final startTime = DateTime.now();
+    print('🚀 [${startTime.toIso8601String()}] Login process started');
+
     if (_formKey.currentState!.validate()) {
       setState(() {
         _isLoading = true;
       });
+      print('⏱️ [${DateTime.now().toIso8601String()}] UI set to loading state');
 
       try {
         // Get the identifier (phone or email) based on current mode
@@ -166,24 +170,56 @@ class _LoginPageState extends State<LoginPage> {
             : _emailController.text.trim();
 
         final password = _passwordController.text;
+        print(
+          '📝 [${DateTime.now().toIso8601String()}] Credentials prepared, calling auth service...',
+        );
 
         // Call the auth service
         final authService = AuthService();
+        final apiCallStart = DateTime.now();
         final response = await authService.login(
           identifier: identifier,
           password: password,
         );
+        final apiCallEnd = DateTime.now();
+        final apiDuration = apiCallEnd.difference(apiCallStart).inMilliseconds;
 
-        // Handle successful login
+        print(
+          '✅ [${apiCallEnd.toIso8601String()}] API call completed in ${apiDuration}ms',
+        );
+        print(
+          '📦 [${DateTime.now().toIso8601String()}] Login response received: ${response.toString()}',
+        );
+
+        // Save credentials if remember me is checked
+        final saveCredentialsStart = DateTime.now();
+        await _saveCredentials();
+        final saveCredentialsEnd = DateTime.now();
+        print(
+          '💾 [${saveCredentialsEnd.toIso8601String()}] Save credentials completed in ${saveCredentialsEnd.difference(saveCredentialsStart).inMilliseconds}ms',
+        );
+
+        // Store user data
+        final storeDataStart = DateTime.now();
+        try {
+          await _storeUserData(response);
+          final storeDataEnd = DateTime.now();
+          print(
+            '🗄️ [${storeDataEnd.toIso8601String()}] Store user data completed in ${storeDataEnd.difference(storeDataStart).inMilliseconds}ms',
+          );
+        } catch (e) {
+          final storeDataEnd = DateTime.now();
+          print(
+            '❌ [${storeDataEnd.toIso8601String()}] Error during user data storage: $e (took ${storeDataEnd.difference(storeDataStart).inMilliseconds}ms)',
+          );
+        }
+
+        // Handle successful login - set loading to false after all operations
+        final setStateStart = DateTime.now();
         setState(() {
           _isLoading = false;
         });
-
-        // Save credentials if remember me is checked
-        await _saveCredentials();
-
-        // Store user data
-        await _storeUserData(response);
+        print('🔄 [${DateTime.now().toIso8601String()}] UI set to not loading');
 
         // Show success message briefly
         if (mounted) {
@@ -199,18 +235,32 @@ class _LoginPageState extends State<LoginPage> {
               ),
             ),
           );
+          print(
+            '📱 [${DateTime.now().toIso8601String()}] Success message shown',
+          );
         }
 
         // Set login status and navigate to home page
+        final prefsStart = DateTime.now();
         final prefs = await SharedPreferences.getInstance();
         await prefs.setBool('isLoggedIn', true);
+        final prefsEnd = DateTime.now();
+        print(
+          '🔐 [${prefsEnd.toIso8601String()}] Login status saved in ${prefsEnd.difference(prefsStart).inMilliseconds}ms',
+        );
 
-        // Navigate to home page after a brief delay
-        Future.delayed(const Duration(seconds: 1), () {
-          if (mounted) {
-            Navigator.of(context).pushReplacementNamed('/home');
-          }
-        });
+        // Navigate to home page immediately
+        final navStart = DateTime.now();
+        Navigator.of(context).pushReplacementNamed('/home');
+        final navEnd = DateTime.now();
+        print(
+          '🏠 [${navEnd.toIso8601String()}] Navigation completed in ${navEnd.difference(navStart).inMilliseconds}ms',
+        );
+
+        final totalTime = navEnd.difference(startTime).inMilliseconds;
+        print(
+          '🎉 [${navEnd.toIso8601String()}] LOGIN COMPLETED in ${totalTime}ms total',
+        );
       } catch (e) {
         if (mounted) {
           setState(() {
@@ -804,25 +854,68 @@ class _LoginPageState extends State<LoginPage> {
 
   // Store user data after successful login
   Future<void> _storeUserData(Map<String, dynamic> response) async {
+    final storeStart = DateTime.now();
+    print(
+      '🗄️ [${storeStart.toIso8601String()}] Starting to store user data...',
+    );
+
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final initStart = DateTime.now();
+      final storageService = StorageService(FlutterSecureStorage());
+      await storageService.initialize();
+      final initEnd = DateTime.now();
+      print(
+        '🔧 [${initEnd.toIso8601String()}] Storage service initialized in ${initEnd.difference(initStart).inMilliseconds}ms',
+      );
 
       // The backend returns: { success: true, message: "...", data: { accessToken: "...", user: { ... } } }
       final responseData = response['data'];
       final userData = responseData?['user'];
+      print('📊 [${DateTime.now().toIso8601String()}] Response data parsed');
+      print('👤 [${DateTime.now().toIso8601String()}] User data: $userData');
 
       if (userData != null) {
-        // Store user data in SharedPreferences
-        await prefs.setString('userData', jsonEncode(userData));
+        // Store user data in secure storage
+        final storeUserStart = DateTime.now();
+        print('💾 [${storeUserStart.toIso8601String()}] Storing user data...');
+        await storageService.storeUserData(jsonEncode(userData));
+        final storeUserEnd = DateTime.now();
+        print(
+          '✅ [${storeUserEnd.toIso8601String()}] User data stored successfully in ${storeUserEnd.difference(storeUserStart).inMilliseconds}ms',
+        );
 
         // Store auth token if available
         final accessToken = responseData?['accessToken'];
         if (accessToken != null) {
-          await prefs.setString(AppConstants.tokenKey, accessToken);
+          final storeTokenStart = DateTime.now();
+          print(
+            '🔑 [${storeTokenStart.toIso8601String()}] Storing auth token: ${accessToken.substring(0, 20)}...',
+          );
+          await storageService.storeAuthToken(accessToken);
+          final storeTokenEnd = DateTime.now();
+          print(
+            '✅ [${storeTokenEnd.toIso8601String()}] Auth token stored successfully in ${storeTokenEnd.difference(storeTokenStart).inMilliseconds}ms',
+          );
+        } else {
+          print(
+            '⚠️ [${DateTime.now().toIso8601String()}] No access token found in response',
+          );
         }
+      } else {
+        print(
+          '⚠️ [${DateTime.now().toIso8601String()}] No user data found in response',
+        );
       }
+
+      final storeEnd = DateTime.now();
+      print(
+        '🎯 [${storeEnd.toIso8601String()}] User data storage completed in ${storeEnd.difference(storeStart).inMilliseconds}ms total',
+      );
     } catch (e) {
-      // Handle error silently
+      final storeEnd = DateTime.now();
+      print(
+        '❌ [${storeEnd.toIso8601String()}] Error storing user data: $e (took ${storeEnd.difference(storeStart).inMilliseconds}ms)',
+      );
     }
   }
 }

@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/services/storage_service.dart';
 
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({super.key});
@@ -29,10 +30,12 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
   bool _hasNumber = false;
   bool _hasSpecialChar = false;
   bool _passwordsMatch = false;
+  late final StorageService _storageService;
 
   @override
   void initState() {
     super.initState();
+    _storageService = StorageService(FlutterSecureStorage());
     _newPasswordController.addListener(_validateNewPassword);
     _confirmPasswordController.addListener(_validatePasswordMatch);
   }
@@ -96,10 +99,9 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
     });
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString(AppConstants.tokenKey);
+      final token = await _storageService.getAuthToken();
 
-      if (token == null) {
+      if (token == null || token.isEmpty) {
         throw Exception('No authentication token found');
       }
 

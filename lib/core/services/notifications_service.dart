@@ -45,11 +45,16 @@ class NotificationsService {
   /// Get notification statistics
   Future<NotificationStats> getNotificationStats() async {
     try {
+      print(
+        'Fetching notification stats from: ${AppConstants.baseUrl}/notifications/stats',
+      );
       final data = await _apiService.get(
         '${AppConstants.baseUrl}/notifications/stats',
       );
+      print('Notification stats response: $data');
       return NotificationStats.fromJson(data);
     } catch (e) {
+      print('Notification stats error: $e');
       throw Exception('Error fetching notification stats: $e');
     }
   }

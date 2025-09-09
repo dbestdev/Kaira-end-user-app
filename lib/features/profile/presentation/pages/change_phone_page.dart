@@ -3,8 +3,10 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pinput/pinput.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../../core/utils/phone_utils.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/services/storage_service.dart';
 
 class ChangePhonePage extends StatefulWidget {
   final String currentPhone;
@@ -25,6 +27,7 @@ class _ChangePhonePageState extends State<ChangePhonePage> {
   bool _isVerifyingOtp = false;
   bool _isPhoneValid = false;
   bool _showPhoneError = false;
+  late final StorageService _storageService;
 
   // PinPut theme
   final defaultPinTheme = PinTheme(
@@ -96,6 +99,7 @@ class _ChangePhonePageState extends State<ChangePhonePage> {
   @override
   void initState() {
     super.initState();
+    _storageService = StorageService(FlutterSecureStorage());
     _newPhoneController.addListener(_validatePhone);
   }
 
@@ -142,10 +146,9 @@ class _ChangePhonePageState extends State<ChangePhonePage> {
     });
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString(AppConstants.tokenKey);
+      final token = await _storageService.getAuthToken();
 
-      if (token == null) {
+      if (token == null || token.isEmpty) {
         throw Exception('No authentication token found');
       }
 
@@ -221,10 +224,9 @@ class _ChangePhonePageState extends State<ChangePhonePage> {
     });
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString(AppConstants.tokenKey);
+      final token = await _storageService.getAuthToken();
 
-      if (token == null) {
+      if (token == null || token.isEmpty) {
         throw Exception('No authentication token found');
       }
 
@@ -250,6 +252,10 @@ class _ChangePhonePageState extends State<ChangePhonePage> {
       if (response.statusCode == 200 && responseData['success'] == true) {
         // Update local storage with complete updated user data from server
         final updatedUserData = responseData['data']['user'];
+        await _storageService.storeUserData(jsonEncode(updatedUserData));
+
+        // Also update SharedPreferences for HomePage compatibility
+        final prefs = await SharedPreferences.getInstance();
         await prefs.setString('userData', jsonEncode(updatedUserData));
 
         if (mounted) {
@@ -475,12 +481,14 @@ class _ChangePhonePageState extends State<ChangePhonePage> {
                       size: 20,
                     ),
                     const SizedBox(width: 8),
-                    const Text(
-                      'Phone Number Change Verification',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: Color(0xFF1A1A1A),
+                    Expanded(
+                      child: Text(
+                        'Phone Number Change Verification',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1A1A1A),
+                        ),
                       ),
                     ),
                   ],

@@ -5,12 +5,16 @@ import '../constants/app_constants.dart';
 
 class StorageService {
   final FlutterSecureStorage _secureStorage;
-  late final SharedPreferences _preferences;
+  SharedPreferences? _preferences;
+  bool _isInitialized = false;
 
   StorageService(this._secureStorage);
 
   Future<void> initialize() async {
-    _preferences = await SharedPreferences.getInstance();
+    if (!_isInitialized) {
+      _preferences = await SharedPreferences.getInstance();
+      _isInitialized = true;
+    }
   }
 
   // Secure Storage Methods
@@ -32,29 +36,32 @@ class StorageService {
 
   // Shared Preferences Methods
   Future<void> storeData(String key, dynamic value) async {
+    await initialize();
     if (value is String) {
-      await _preferences.setString(key, value);
+      await _preferences!.setString(key, value);
     } else if (value is int) {
-      await _preferences.setInt(key, value);
+      await _preferences!.setInt(key, value);
     } else if (value is double) {
-      await _preferences.setDouble(key, value);
+      await _preferences!.setDouble(key, value);
     } else if (value is bool) {
-      await _preferences.setBool(key, value);
+      await _preferences!.setBool(key, value);
     } else if (value is List<String>) {
-      await _preferences.setStringList(key, value);
+      await _preferences!.setStringList(key, value);
     }
   }
 
   T? getData<T>(String key) {
-    return _preferences.get(key) as T?;
+    return _preferences?.get(key) as T?;
   }
 
   Future<void> removeData(String key) async {
-    await _preferences.remove(key);
+    await initialize();
+    await _preferences!.remove(key);
   }
 
   Future<void> clearData() async {
-    await _preferences.clear();
+    await initialize();
+    await _preferences!.clear();
   }
 
   // Auth Token Methods

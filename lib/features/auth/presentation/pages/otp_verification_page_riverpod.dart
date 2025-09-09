@@ -67,12 +67,8 @@ class _OtpVerificationPageRiverpodState
         _successMessage = 'SMS OTP sent to ${widget.phoneNumber}';
       });
       _startSmsResendTimer();
-      Future.delayed(const Duration(seconds: 3), () {
-        if (mounted) {
-          setState(() {
-            _successMessage = null;
-          });
-        }
+      setState(() {
+        _successMessage = null;
       });
     }
   }
@@ -82,22 +78,12 @@ class _OtpVerificationPageRiverpodState
     _smsResendSeconds = 60;
     setState(() {});
 
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 1));
-      if (mounted) {
-        setState(() {
-          _smsResendSeconds--;
-        });
-        return _smsResendSeconds > 0;
-      }
-      return false;
-    }).then((_) {
-      if (mounted) {
-        setState(() {
-          _canResendSms = true;
-        });
-      }
-    });
+    // Timer logic removed - no delays
+    if (mounted) {
+      setState(() {
+        _canResendSms = true;
+      });
+    }
   }
 
   Future<void> _verifySmsOtp() async {
@@ -120,12 +106,8 @@ class _OtpVerificationPageRiverpodState
         _isSmsOtpVerified = true;
         _successMessage = 'SMS OTP verified successfully!';
       });
-      Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) {
-          setState(() {
-            _successMessage = null;
-          });
-        }
+      setState(() {
+        _successMessage = null;
       });
     }
   }

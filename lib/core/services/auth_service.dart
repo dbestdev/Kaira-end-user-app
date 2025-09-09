@@ -8,14 +8,34 @@ class AuthService {
     required String identifier,
     required String password,
   }) async {
+    final authStart = DateTime.now();
+    print('🔐 [${authStart.toIso8601String()}] AuthService.login called');
+
     try {
+      final apiStart = DateTime.now();
+      print(
+        '🌐 [${apiStart.toIso8601String()}] Making API call to /auth/login',
+      );
+
       final response = await _apiService.post('/auth/login', {
         'identifier': identifier,
         'password': password,
       });
 
+      final apiEnd = DateTime.now();
+      print(
+        '📡 [${apiEnd.toIso8601String()}] API call completed in ${apiEnd.difference(apiStart).inMilliseconds}ms',
+      );
+      print(
+        '📦 [${apiEnd.toIso8601String()}] Response received: ${response.toString().substring(0, 100)}...',
+      );
+
       return response;
     } catch (e) {
+      final authEnd = DateTime.now();
+      print(
+        '❌ [${authEnd.toIso8601String()}] AuthService.login failed in ${authEnd.difference(authStart).inMilliseconds}ms: $e',
+      );
       rethrow;
     }
   }

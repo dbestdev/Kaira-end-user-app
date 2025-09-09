@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:pinput/pinput.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:convert';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/services/storage_service.dart';
 
 class ChangeEmailPage extends StatefulWidget {
   final String currentEmail;
@@ -24,6 +26,7 @@ class _ChangeEmailPageState extends State<ChangeEmailPage> {
   bool _isVerifyingOtp = false;
   bool _isEmailValid = false;
   bool _showEmailError = false;
+  late final StorageService _storageService;
 
   // PinPut theme
   final defaultPinTheme = PinTheme(
@@ -95,6 +98,7 @@ class _ChangeEmailPageState extends State<ChangeEmailPage> {
   @override
   void initState() {
     super.initState();
+    _storageService = StorageService(FlutterSecureStorage());
     _newEmailController.addListener(_validateEmail);
   }
 
@@ -130,10 +134,9 @@ class _ChangeEmailPageState extends State<ChangeEmailPage> {
     });
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString(AppConstants.tokenKey);
+      final token = await _storageService.getAuthToken();
 
-      if (token == null) {
+      if (token == null || token.isEmpty) {
         throw Exception('No authentication token found');
       }
 
@@ -198,10 +201,9 @@ class _ChangeEmailPageState extends State<ChangeEmailPage> {
     });
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString(AppConstants.tokenKey);
+      final token = await _storageService.getAuthToken();
 
-      if (token == null) {
+      if (token == null || token.isEmpty) {
         throw Exception('No authentication token found');
       }
 
@@ -222,6 +224,10 @@ class _ChangeEmailPageState extends State<ChangeEmailPage> {
       if (response.statusCode == 200 && responseData['success'] == true) {
         // Update local storage with complete updated user data from server
         final updatedUserData = responseData['data']['user'];
+        await _storageService.storeUserData(jsonEncode(updatedUserData));
+
+        // Also update SharedPreferences for HomePage compatibility
+        final prefs = await SharedPreferences.getInstance();
         await prefs.setString('userData', jsonEncode(updatedUserData));
 
         if (mounted) {

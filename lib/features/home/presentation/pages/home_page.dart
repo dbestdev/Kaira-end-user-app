@@ -18,6 +18,8 @@ import 'package:end_user_app/features/wallet/presentation/pages/wallet_page.dart
 import 'package:end_user_app/core/constants/app_constants.dart';
 import 'package:end_user_app/core/services/user_service.dart';
 import 'package:end_user_app/core/services/notifications_service.dart';
+import 'package:end_user_app/core/services/storage_service.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class HomePage extends StatefulWidget {
@@ -36,6 +38,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   String _currentAddress = 'Getting your location...';
   Set<Marker> _markers = {};
   bool _isLocationLoading = true;
+  bool _isDistancePanelCollapsed = false;
 
   // Draggable sheet variables
   double _sheetHeight = 0.50; // 50% of screen height (initial expanded state)
@@ -103,6 +106,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   // Notification state
   int _unreadNotificationCount = 0;
   Timer? _notificationRefreshTimer;
+  DateTime? _lastNotificationRefresh;
+  DateTime? _lastUserProfileRefresh;
 
   Widget _buildDrawerHeader() {
     final double rating = (_currentUser['rating'] is num)
@@ -309,6 +314,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void initState() {
     super.initState();
+    print(
+      '🏠 HomePage initState called at ${DateTime.now().toIso8601String()}',
+    );
     WidgetsBinding.instance.addObserver(this);
     _getCurrentLocation();
     _loadUserData();
@@ -329,8 +337,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
-      // Refresh notification stats when app becomes active
-      _loadNotificationStats();
+      // Refresh notification stats when app becomes active (with debouncing)
+      if (_lastNotificationRefresh == null ||
+          DateTime.now().difference(_lastNotificationRefresh!).inSeconds > 10) {
+        _loadNotificationStats();
+      }
     }
   }
 
@@ -338,23 +349,61 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Refresh notification stats when dependencies change (e.g., returning from other screens)
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadNotificationStats();
-    });
+    // Only refresh notification stats if we haven't loaded them recently
+    // This prevents duplicate API calls during normal app lifecycle
+    final now = DateTime.now();
+    final shouldRefresh =
+        _lastNotificationRefresh == null ||
+        now.difference(_lastNotificationRefresh!).inSeconds > 5;
+
+    print(
+      '🔍 didChangeDependencies called - shouldRefresh: $shouldRefresh, lastRefresh: $_lastNotificationRefresh',
+    );
+
+    if (shouldRefresh) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        print('🔄 Calling _loadNotificationStats from didChangeDependencies');
+        _loadNotificationStats();
+      });
+    } else {
+      print('⏭️ Skipping notification refresh - too recent');
+    }
   }
 
-  // Load notification stats
+  // Load notification stats with global debouncing
   Future<void> _loadNotificationStats() async {
+    final now = DateTime.now();
+    final shouldRefresh =
+        _lastNotificationRefresh == null ||
+        now.difference(_lastNotificationRefresh!).inSeconds >
+            2; // Reduced to 2 seconds for initial load
+
+    print(
+      '📊 _loadNotificationStats called at ${now.toIso8601String()} - shouldRefresh: $shouldRefresh',
+    );
+
+    if (!shouldRefresh) {
+      print(
+        '⏭️ Skipping notification refresh - too recent (${now.difference(_lastNotificationRefresh!).inSeconds}s ago)',
+      );
+      return;
+    }
+
+    // Set timestamp immediately to prevent duplicate calls
+    _lastNotificationRefresh = now;
+
     try {
       final stats = await _notificationsService.getNotificationStats();
       if (mounted) {
         setState(() {
           _unreadNotificationCount = stats.unread;
         });
+        print('✅ Notification stats updated - unread: ${stats.unread}');
       }
     } catch (e) {
-      // Handle error silently
+      // Log error for debugging
+      print('Notification stats error: $e');
+      // Handle error silently for user experience
     }
   }
 
@@ -362,8 +411,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   void _startNotificationRefreshTimer() {
     _notificationRefreshTimer = Timer.periodic(
       const Duration(
-        seconds: 10,
-      ), // Refresh every 10 seconds for more responsiveness
+        seconds: 30,
+      ), // Refresh every 30 seconds to reduce API calls
       (timer) {
         if (mounted) {
           _loadNotificationStats();
@@ -396,8 +445,27 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     } finally {}
   }
 
-  // Load user data from server
+  // Load user data from server with debouncing
   Future<void> _loadFromServer() async {
+    final now = DateTime.now();
+    final shouldRefresh =
+        _lastUserProfileRefresh == null ||
+        now.difference(_lastUserProfileRefresh!).inSeconds > 2;
+
+    print(
+      '👤 _loadFromServer called at ${now.toIso8601String()} - shouldRefresh: $shouldRefresh',
+    );
+
+    if (!shouldRefresh) {
+      print(
+        '⏭️ Skipping user profile load - too recent (${now.difference(_lastUserProfileRefresh!).inSeconds}s ago)',
+      );
+      return;
+    }
+
+    // Set timestamp immediately to prevent duplicate calls
+    _lastUserProfileRefresh = now;
+
     try {
       final userProfile = await _userService.getUserProfile();
 
@@ -407,13 +475,34 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       setState(() {
         _currentUser = _buildUserDataFromResponse(userData);
       });
+      print('✅ User profile loaded from server');
     } catch (serverError) {
       // Keep existing data if server fails
+      print('❌ User profile load failed: $serverError');
     }
   }
 
-  // Sync with server in background (non-blocking)
+  // Sync with server in background (non-blocking) with debouncing
   Future<void> _syncWithServerInBackground() async {
+    final now = DateTime.now();
+    final shouldRefresh =
+        _lastUserProfileRefresh == null ||
+        now.difference(_lastUserProfileRefresh!).inSeconds > 2;
+
+    print(
+      '👤 _syncWithServerInBackground called at ${now.toIso8601String()} - shouldRefresh: $shouldRefresh',
+    );
+
+    if (!shouldRefresh) {
+      print(
+        '⏭️ Skipping user profile refresh - too recent (${now.difference(_lastUserProfileRefresh!).inSeconds}s ago)',
+      );
+      return;
+    }
+
+    // Set timestamp immediately to prevent duplicate calls
+    _lastUserProfileRefresh = now;
+
     try {
       final userProfile = await _userService.getUserProfile();
       final userData = userProfile['data']?['user'] ?? userProfile;
@@ -423,9 +512,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         setState(() {
           _currentUser = _buildUserDataFromResponse(userData);
         });
+        print('✅ User profile updated from server');
       }
     } catch (e) {
       // Don't update UI if sync fails
+      print('❌ User profile sync failed: $e');
     }
   }
 
@@ -609,8 +700,11 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
-  // Autosuggest methods
+  // Autosuggest methods (OPTIMIZED WITH DEBOUNCING)
   Future<void> _fetchAutosuggestions(String query) async {
+    // Cancel previous timer
+    _searchDebounceTimer?.cancel();
+
     if (query.trim().isEmpty) {
       setState(() {
         _searchSuggestions = [];
@@ -619,36 +713,95 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
       return;
     }
 
+    // Debounce the search to prevent excessive API calls
+    _searchDebounceTimer = Timer(const Duration(milliseconds: 300), () async {
+      await _performAutosuggestSearch(query);
+    });
+  }
+
+  Future<void> _performAutosuggestSearch(String query) async {
+    print('🔍 Services Autosuggest - Searching for: "$query"');
+    print(
+      '🔍 Services Autosuggest - URL: ${AppConstants.baseUrl}/services/autosuggest',
+    );
+
     try {
+      // Get auth token for the request
+      final storageService = StorageService(FlutterSecureStorage());
+      await storageService.initialize();
+      final authToken = await storageService.getAuthToken();
+
+      print(
+        '🔍 Services Autosuggest - Auth token: ${authToken != null ? 'Present' : 'Missing'}',
+      );
+
+      final headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+
+      if (authToken != null) {
+        headers['Authorization'] = 'Bearer $authToken';
+        print('🔍 Services Autosuggest - Authorization header added');
+      } else {
+        print(
+          '🔍 Services Autosuggest - No auth token, proceeding without authentication',
+        );
+      }
+
       final response = await http.post(
         Uri.parse('${AppConstants.baseUrl}/services/autosuggest'),
-        headers: {'Content-Type': 'application/json'},
+        headers: headers,
         body: json.encode({'query': query}),
       );
 
+      print(
+        '🔍 Services Autosuggest - Response status: ${response.statusCode}',
+      );
+      print('🔍 Services Autosuggest - Response body: ${response.body}');
+
       if (response.statusCode == 200 || response.statusCode == 201) {
         final data = json.decode(response.body);
+        print('🔍 Services Autosuggest - Parsed data: $data');
 
         if (data['success'] == true) {
+          final results = List<Map<String, dynamic>>.from(
+            data['results'] ?? [],
+          );
+          print('🔍 Services Autosuggest - Found ${results.length} results');
+
+          if (results.isEmpty) {
+            // Add a "no services found" message
+            results.add({
+              'type': 'no_results',
+              'id': 'no_results',
+              'name': 'No services found for "$query"',
+              'description': 'Try a different search term',
+              'icon': 'search_off',
+              'color': '#757575',
+            });
+          }
+
           setState(() {
-            _searchSuggestions = List<Map<String, dynamic>>.from(
-              data['results'],
-            );
-            _showSuggestions = true;
+            _searchSuggestions = results;
+            _showSuggestions = true; // Always show suggestions, even if empty
           });
         } else {
+          print('🔍 Services Autosuggest - API returned success: false');
           setState(() {
             _searchSuggestions = [];
             _showSuggestions = false;
           });
         }
       } else {
+        print('🔍 Services Autosuggest - HTTP error: ${response.statusCode}');
         setState(() {
           _searchSuggestions = [];
           _showSuggestions = false;
         });
       }
     } catch (e) {
+      print('🔍 Services Autosuggest - Exception: $e');
       setState(() {
         _searchSuggestions = [];
         _showSuggestions = false;
@@ -771,16 +924,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           final artisans = data['artisans'] as List;
 
           if (artisans.isNotEmpty) {
+            // Limit the number of artisans to prevent performance issues
+            final limitedArtisans = artisans.take(10).toList();
+
             // Store artisans and show them in the transformed draggable
             setState(() {
-              _foundArtisans = List<Map<String, dynamic>>.from(artisans);
+              _foundArtisans = List<Map<String, dynamic>>.from(limitedArtisans);
               _selectedServiceName = serviceName;
               _showingArtisans = true;
               _isArtisanSearchLoading = false;
             });
 
             // Add artisan markers to the map
-            _addArtisanMarkersToMap(artisans);
+            _addArtisanMarkersToMap(limitedArtisans);
           } else {
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
@@ -963,20 +1119,13 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
     }
   }
 
-  // Add artisan markers to the map
+  // Add artisan markers to the map (CREATIVE LIGHTWEIGHT VERSION)
   void _addArtisanMarkersToMap(List<dynamic> artisans) async {
     final Set<Marker> artisanMarkers = {};
     final Set<Polyline> artisanPolylines = {};
 
-    // Create custom user marker icon (Blue with person icon)
-    final userMarkerIcon = await _createCustomMarkerIcon(
-      color: const Color(0xFF2196F3),
-      icon: Icons.person_pin_circle,
-      label: 'You',
-      isUser: true,
-    );
-
-    // Update user marker with custom icon
+    // Create distinctive user marker with custom icon (lightweight)
+    final userMarkerIcon = await _createLightweightUserMarker();
     final userMarker = Marker(
       markerId: const MarkerId('user_location'),
       position: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
@@ -985,75 +1134,93 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         title: '📍 Your Location',
         snippet: 'You are here',
       ),
-      anchor: const Offset(0.5, 1.0),
+      anchor: const Offset(0.5, 0.5),
     );
 
     // Replace user marker in the set
     _markers.removeWhere((marker) => marker.markerId.value == 'user_location');
     _markers.add(userMarker);
 
-    for (final artisan in artisans) {
-      if (artisan['location']?['latitude'] != null &&
-          artisan['location']?['longitude'] != null &&
-          _currentPosition != null) {
-        final artisanLat = double.parse(
-          artisan['location']['latitude'].toString(),
-        );
-        final artisanLng = double.parse(
-          artisan['location']['longitude'].toString(),
-        );
+    // Store artisan data for distance panel
+    _foundArtisans = artisans.cast<Map<String, dynamic>>();
 
-        // Create custom artisan marker icon (Orange/Red with tools icon)
-        final artisanMarkerIcon = await _createCustomMarkerIcon(
-          color: const Color(0xFFFF5722),
-          icon: Icons.build_circle,
-          label: (artisan['name'] ?? 'Artisan').toString().split(' ')[0],
-          isUser: false,
-        );
+    // Process artisans in batches to prevent UI freezing
+    const int batchSize = 5;
+    for (int i = 0; i < artisans.length; i += batchSize) {
+      final batch = artisans.skip(i).take(batchSize);
 
-        // Create marker
-        final marker = Marker(
-          markerId: MarkerId('artisan_${artisan['id']}'),
-          position: LatLng(artisanLat, artisanLng),
-          infoWindow: InfoWindow(
-            title: '🔧 ${artisan['name'] ?? 'Professional Artisan'}',
-            snippet:
-                '${_formatDistance(artisan['distance'])}km away • ₦${_formatHourlyRate(artisan['hourlyRate'])}/hr',
-          ),
-          icon: artisanMarkerIcon,
-          anchor: const Offset(0.5, 1.0),
-        );
+      for (final artisan in batch) {
+        if (artisan['location']?['latitude'] != null &&
+            artisan['location']?['longitude'] != null &&
+            _currentPosition != null) {
+          final artisanLat = double.parse(
+            artisan['location']['latitude'].toString(),
+          );
+          final artisanLng = double.parse(
+            artisan['location']['longitude'].toString(),
+          );
 
-        // Generate realistic route points
-        final routePoints = _generateRealisticRoute(
-          LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-          LatLng(artisanLat, artisanLng),
-        );
+          // Create distinctive artisan marker (lightweight)
+          final artisanMarkerIcon = await _createLightweightArtisanMarker(
+            artisan,
+            i,
+          );
+          final marker = Marker(
+            markerId: MarkerId('artisan_${artisan['id']}'),
+            position: LatLng(artisanLat, artisanLng),
+            icon: artisanMarkerIcon,
+            infoWindow: InfoWindow(
+              title: '🔧 ${artisan['name'] ?? 'Professional Artisan'}',
+              snippet:
+                  '${_formatDistance(artisan['distance'])}km away • ₦${_formatHourlyRate(artisan['hourlyRate'])}/hr',
+            ),
+            anchor: const Offset(0.5, 0.5),
+          );
 
-        // Store route points for this artisan
-        _routePoints['route_to_${artisan['id']}'] = routePoints;
+          // Create curved polyline like Uber/Bolt
+          final routePoints = _generateCurvedRoute(
+            LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+            LatLng(artisanLat, artisanLng),
+            i,
+          );
 
-        // Create beautiful polyline with route points
-        final polyline = Polyline(
-          polylineId: PolylineId('route_to_${artisan['id']}'),
-          points: routePoints,
-          color: const Color(0xFF4CAF50), // Green color for better contrast
-          width: 5,
-          geodesic: false, // Use actual route points instead of geodesic
-          startCap: Cap.roundCap,
-          endCap: Cap.roundCap,
-          patterns: [
-            PatternItem.dash(20),
-            PatternItem.gap(10),
-          ], // Dashed line pattern for better visibility
-          consumeTapEvents: true, // Allow tapping on routes
-        );
+          // Store route points for this artisan
+          _routePoints['route_to_${artisan['id']}'] = routePoints;
 
-        artisanMarkers.add(marker);
-        artisanPolylines.add(polyline);
+          // Create creative curved polyline with distance display
+          final polyline = Polyline(
+            polylineId: PolylineId('route_to_${artisan['id']}'),
+            points: routePoints,
+            color: _getArtisanRouteColor(i),
+            width: 5,
+            geodesic: false, // Use custom curved path
+            startCap: Cap.roundCap,
+            endCap: Cap.roundCap,
+            patterns: [PatternItem.dash(25), PatternItem.gap(15)],
+          );
+
+          artisanMarkers.add(marker);
+          artisanPolylines.add(polyline);
+        }
+      }
+
+      // Update UI after each batch to prevent freezing
+      if (i + batchSize < artisans.length) {
+        setState(() {
+          _markers.addAll(artisanMarkers);
+          _polylines.addAll(artisanPolylines);
+        });
+
+        // Small delay to allow UI to update
+        await Future.delayed(const Duration(milliseconds: 50));
+
+        // Clear the sets for next batch
+        artisanMarkers.clear();
+        artisanPolylines.clear();
       }
     }
 
+    // Final update with remaining markers
     setState(() {
       _markers.addAll(artisanMarkers);
       _polylines.addAll(artisanPolylines);
@@ -1061,6 +1228,656 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
     // Adjust map camera to show all markers
     _adjustMapCameraToShowAllMarkers();
+  }
+
+  // Create BIG user marker with shadow effects
+  Future<BitmapDescriptor> _createLightweightUserMarker() async {
+    final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
+    final Canvas canvas = Canvas(pictureRecorder);
+    final Paint paint = Paint();
+
+    // Create shadow effect (multiple layers)
+    paint.color = Colors.black.withOpacity(0.3);
+    canvas.drawCircle(const Offset(55, 55), 50, paint);
+
+    paint.color = Colors.black.withOpacity(0.2);
+    canvas.drawCircle(const Offset(52, 52), 50, paint);
+
+    paint.color = Colors.black.withOpacity(0.1);
+    canvas.drawCircle(const Offset(50, 50), 50, paint);
+
+    // Create main blue circle with gradient effect
+    paint.color = const Color(0xFF2196F3);
+    canvas.drawCircle(const Offset(50, 50), 50, paint);
+
+    // Add inner highlight
+    paint.color = Colors.white.withOpacity(0.3);
+    canvas.drawCircle(const Offset(45, 45), 35, paint);
+
+    // Add white border
+    paint.color = Colors.white;
+    paint.style = PaintingStyle.stroke;
+    paint.strokeWidth = 6;
+    canvas.drawCircle(const Offset(50, 50), 50, paint);
+
+    // Add person icon with shadow
+    paint.color = Colors.black.withOpacity(0.3);
+    paint.style = PaintingStyle.fill;
+    final shadowPainter = TextPainter(
+      text: const TextSpan(
+        text: '👤',
+        style: TextStyle(fontSize: 50, color: Colors.black),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    shadowPainter.layout();
+    shadowPainter.paint(
+      canvas,
+      Offset(
+        50 - shadowPainter.width / 2 + 2,
+        50 - shadowPainter.height / 2 + 2,
+      ),
+    );
+
+    // Add person icon
+    paint.color = Colors.white;
+    final textPainter = TextPainter(
+      text: const TextSpan(
+        text: '👤',
+        style: TextStyle(fontSize: 50, color: Colors.white),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(
+      canvas,
+      Offset(50 - textPainter.width / 2, 50 - textPainter.height / 2),
+    );
+
+    // Add "YOU" label with background
+    paint.color = Colors.white;
+    paint.style = PaintingStyle.fill;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        const Rect.fromLTWH(30, 85, 40, 20),
+        const Radius.circular(10),
+      ),
+      paint,
+    );
+
+    paint.color = const Color(0xFF2196F3);
+    paint.style = PaintingStyle.stroke;
+    paint.strokeWidth = 2;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        const Rect.fromLTWH(30, 85, 40, 20),
+        const Radius.circular(10),
+      ),
+      paint,
+    );
+
+    final labelPainter = TextPainter(
+      text: const TextSpan(
+        text: 'YOU',
+        style: TextStyle(
+          fontSize: 14,
+          color: Color(0xFF2196F3),
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    labelPainter.layout();
+    labelPainter.paint(canvas, Offset(50 - labelPainter.width / 2, 90));
+
+    final ui.Picture picture = pictureRecorder.endRecording();
+    final ui.Image image = await picture.toImage(100, 110);
+    final ByteData? byteData = await image.toByteData(
+      format: ui.ImageByteFormat.png,
+    );
+    final Uint8List uint8List = byteData!.buffer.asUint8List();
+
+    return BitmapDescriptor.fromBytes(uint8List);
+  }
+
+  // Create BIG artisan marker with shadow effects
+  Future<BitmapDescriptor> _createLightweightArtisanMarker(
+    Map<String, dynamic> artisan,
+    int index,
+  ) async {
+    final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
+    final Canvas canvas = Canvas(pictureRecorder);
+    final Paint paint = Paint();
+
+    // Get artisan's first name for personalization
+    final String firstName = (artisan['name'] ?? 'Artisan').toString().split(
+      ' ',
+    )[0];
+    final String firstLetter = firstName.isNotEmpty
+        ? firstName[0].toUpperCase()
+        : 'A';
+
+    // Create a colorful circular marker
+    final List<Color> colors = [
+      const Color(0xFFFF5722), // Orange
+      const Color(0xFF4CAF50), // Green
+      const Color(0xFF9C27B0), // Purple
+      const Color(0xFFE91E63), // Pink
+      const Color(0xFF00BCD4), // Cyan
+      const Color(0xFFFF9800), // Amber
+      const Color(0xFF795548), // Brown
+      const Color(0xFF607D8B), // Blue Grey
+    ];
+
+    final Color markerColor = colors[index % colors.length];
+
+    // Create shadow effect (multiple layers)
+    paint.color = Colors.black.withOpacity(0.3);
+    canvas.drawCircle(const Offset(55, 55), 50, paint);
+
+    paint.color = Colors.black.withOpacity(0.2);
+    canvas.drawCircle(const Offset(52, 52), 50, paint);
+
+    paint.color = Colors.black.withOpacity(0.1);
+    canvas.drawCircle(const Offset(50, 50), 50, paint);
+
+    // Draw main circle
+    paint.color = markerColor;
+    canvas.drawCircle(const Offset(50, 50), 50, paint);
+
+    // Add inner highlight
+    paint.color = Colors.white.withOpacity(0.3);
+    canvas.drawCircle(const Offset(45, 45), 35, paint);
+
+    // Add white border
+    paint.color = Colors.white;
+    paint.style = PaintingStyle.stroke;
+    paint.strokeWidth = 6;
+    canvas.drawCircle(const Offset(50, 50), 50, paint);
+
+    // Add tools icon with shadow
+    paint.color = Colors.black.withOpacity(0.3);
+    paint.style = PaintingStyle.fill;
+    final shadowPainter = TextPainter(
+      text: const TextSpan(
+        text: '🔧',
+        style: TextStyle(fontSize: 40, color: Colors.black),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    shadowPainter.layout();
+    shadowPainter.paint(
+      canvas,
+      Offset(
+        50 - shadowPainter.width / 2 + 2,
+        50 - shadowPainter.height / 2 - 3 + 2,
+      ),
+    );
+
+    // Add tools icon
+    paint.color = Colors.white;
+    final textPainter = TextPainter(
+      text: const TextSpan(
+        text: '🔧',
+        style: TextStyle(fontSize: 40, color: Colors.white),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    textPainter.layout();
+    textPainter.paint(
+      canvas,
+      Offset(50 - textPainter.width / 2, 50 - textPainter.height / 2 - 3),
+    );
+
+    // Add artisan's first letter with shadow
+    paint.color = Colors.black.withOpacity(0.3);
+    final letterShadowPainter = TextPainter(
+      text: TextSpan(
+        text: firstLetter,
+        style: const TextStyle(
+          fontSize: 24,
+          color: Colors.black,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    letterShadowPainter.layout();
+    letterShadowPainter.paint(
+      canvas,
+      Offset(50 - letterShadowPainter.width / 2 + 1, 50 + 12 + 1),
+    );
+
+    // Add artisan's first letter
+    final letterPainter = TextPainter(
+      text: TextSpan(
+        text: firstLetter,
+        style: const TextStyle(
+          fontSize: 24,
+          color: Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    letterPainter.layout();
+    letterPainter.paint(canvas, Offset(50 - letterPainter.width / 2, 50 + 12));
+
+    // Add artisan name with background
+    paint.color = Colors.white;
+    paint.style = PaintingStyle.fill;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(
+          center: Offset(50, 85),
+          width: firstName.length * 8.0 + 16,
+          height: 18,
+        ),
+        const Radius.circular(9),
+      ),
+      paint,
+    );
+
+    paint.color = markerColor;
+    paint.style = PaintingStyle.stroke;
+    paint.strokeWidth = 2;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(
+          center: Offset(50, 85),
+          width: firstName.length * 8.0 + 16,
+          height: 18,
+        ),
+        const Radius.circular(9),
+      ),
+      paint,
+    );
+
+    final namePainter = TextPainter(
+      text: TextSpan(
+        text: firstName,
+        style: TextStyle(
+          fontSize: 12,
+          color: markerColor,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    );
+    namePainter.layout();
+    namePainter.paint(canvas, Offset(50 - namePainter.width / 2, 78));
+
+    final ui.Picture picture = pictureRecorder.endRecording();
+    final ui.Image image = await picture.toImage(100, 110);
+    final ByteData? byteData = await image.toByteData(
+      format: ui.ImageByteFormat.png,
+    );
+    final Uint8List uint8List = byteData!.buffer.asUint8List();
+
+    return BitmapDescriptor.fromBytes(uint8List);
+  }
+
+  // Generate curved route like Uber/Bolt
+  List<LatLng> _generateCurvedRoute(LatLng start, LatLng end, int index) {
+    final List<LatLng> points = [];
+
+    // Calculate distance for curve intensity adjustment
+    final double distance = Geolocator.distanceBetween(
+      start.latitude,
+      start.longitude,
+      end.latitude,
+      end.longitude,
+    );
+
+    // Adjust curve intensity based on distance
+    final double distanceFactor = (distance / 1000).clamp(0.5, 2.0);
+
+    // Create different curve patterns based on index
+    final List<double> curvePatterns = [
+      0.3,
+      0.5,
+      0.7,
+      0.4,
+      0.6,
+      0.8,
+      0.35,
+      0.65,
+    ];
+    final double curveIntensity = curvePatterns[index % curvePatterns.length];
+
+    // Calculate control points for Bezier curve
+    final double midLat = (start.latitude + end.latitude) / 2;
+    final double midLng = (start.longitude + end.longitude) / 2;
+
+    // Add curve offset based on index for variety and distance
+    final double latOffset =
+        (index % 2 == 0 ? 1 : -1) * 0.01 * curveIntensity * distanceFactor;
+    final double lngOffset =
+        (index % 3 == 0 ? 1 : -1) * 0.01 * curveIntensity * distanceFactor;
+
+    final LatLng controlPoint1 = LatLng(
+      start.latitude + (midLat - start.latitude) * 0.5 + latOffset,
+      start.longitude + (midLng - start.longitude) * 0.5 + lngOffset,
+    );
+
+    final LatLng controlPoint2 = LatLng(
+      midLat + (end.latitude - midLat) * 0.5 - latOffset,
+      midLng + (end.longitude - midLng) * 0.5 - lngOffset,
+    );
+
+    // Generate points along the curved path
+    const int numPoints = 20;
+    for (int i = 0; i <= numPoints; i++) {
+      final double t = i / numPoints.toDouble();
+
+      // Cubic Bezier curve calculation
+      final double lat = _cubicBezier(
+        start.latitude,
+        controlPoint1.latitude,
+        controlPoint2.latitude,
+        end.latitude,
+        t,
+      );
+
+      final double lng = _cubicBezier(
+        start.longitude,
+        controlPoint1.longitude,
+        controlPoint2.longitude,
+        end.longitude,
+        t,
+      );
+
+      points.add(LatLng(lat, lng));
+    }
+
+    return points;
+  }
+
+  // Cubic Bezier curve calculation
+  double _cubicBezier(double p0, double p1, double p2, double p3, double t) {
+    final double u = 1 - t;
+    final double tt = t * t;
+    final double uu = u * u;
+    final double uuu = uu * u;
+    final double ttt = tt * t;
+
+    return uuu * p0 + 3 * uu * t * p1 + 3 * u * tt * p2 + ttt * p3;
+  }
+
+  // Calculate different travel distances
+  Map<String, String> _calculateTravelDistances(LatLng start, LatLng end) {
+    final double straightDistance = Geolocator.distanceBetween(
+      start.latitude,
+      start.longitude,
+      end.latitude,
+      end.longitude,
+    );
+
+    // Convert to kilometers
+    final double distanceKm = straightDistance / 1000;
+
+    // Calculate different travel modes with realistic factors
+    final double walkingDistance =
+        distanceKm * 1.3; // Walking is typically 30% longer
+    final double drivingDistance =
+        distanceKm * 1.15; // Driving is typically 15% longer
+    final double ridingDistance =
+        distanceKm * 1.1; // Riding (bike/motorcycle) is typically 10% longer
+
+    return {
+      'walking': '${walkingDistance.toStringAsFixed(1)} km',
+      'driving': '${drivingDistance.toStringAsFixed(1)} km',
+      'riding': '${ridingDistance.toStringAsFixed(1)} km',
+      'straight': '${distanceKm.toStringAsFixed(1)} km',
+    };
+  }
+
+  // Calculate travel times
+  Map<String, String> _calculateTravelTimes(double distanceKm) {
+    // Average speeds (km/h)
+    const double walkingSpeed = 5.0;
+    const double drivingSpeed = 30.0;
+    const double ridingSpeed = 25.0;
+
+    final int walkingMinutes = ((distanceKm / walkingSpeed) * 60).round();
+    final int drivingMinutes = ((distanceKm / drivingSpeed) * 60).round();
+    final int ridingMinutes = ((distanceKm / ridingSpeed) * 60).round();
+
+    return {
+      'walking': '${walkingMinutes} min',
+      'driving': '${drivingMinutes} min',
+      'riding': '${ridingMinutes} min',
+    };
+  }
+
+  // Build distance information panel with toggle
+  Widget _buildDistancePanel() {
+    if (_foundArtisans.isEmpty || _currentPosition == null) {
+      return const SizedBox.shrink();
+    }
+
+    // Get the closest artisan for distance calculations
+    final closestArtisan = _foundArtisans.first;
+    final artisanLat = double.parse(
+      closestArtisan['location']['latitude'].toString(),
+    );
+    final artisanLng = double.parse(
+      closestArtisan['location']['longitude'].toString(),
+    );
+
+    final distances = _calculateTravelDistances(
+      LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+      LatLng(artisanLat, artisanLng),
+    );
+
+    final times = _calculateTravelTimes(
+      Geolocator.distanceBetween(
+            _currentPosition!.latitude,
+            _currentPosition!.longitude,
+            artisanLat,
+            artisanLng,
+          ) /
+          1000,
+    );
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 600),
+      curve: Curves.easeInOut,
+      width: _isDistancePanelCollapsed
+          ? null
+          : 200, // Let it size naturally when collapsed
+      height: _isDistancePanelCollapsed
+          ? null
+          : 200, // Let it size naturally when collapsed
+      padding: _isDistancePanelCollapsed
+          ? EdgeInsets.zero
+          : const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: _isDistancePanelCollapsed
+            ? Colors.transparent
+            : Colors.white.withOpacity(0.9),
+        borderRadius: BorderRadius.circular(
+          12,
+        ), // Same rounded corners for both states
+        boxShadow: _isDistancePanelCollapsed
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+      ),
+      child: _isDistancePanelCollapsed
+          ? _buildCollapsedPanel()
+          : _buildExpandedPanel(distances, times),
+    );
+  }
+
+  // Build collapsed panel (exact same size as hamburger menu)
+  Widget _buildCollapsedPanel() {
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _isDistancePanelCollapsed = false;
+        });
+      },
+      child: Container(
+        padding: const EdgeInsets.all(8), // Same padding as hamburger
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.9), // Same color as hamburger
+          borderRadius: BorderRadius.circular(
+            12,
+          ), // Same border radius as hamburger
+        ),
+        child: const Icon(
+          Icons.route,
+          color: Color(0xFF2196F3), // Same color as hamburger
+          size: 24, // Same size as hamburger
+        ),
+      ),
+    );
+  }
+
+  // Build expanded panel (full content)
+  Widget _buildExpandedPanel(
+    Map<String, String> distances,
+    Map<String, String> times,
+  ) {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Header with toggle button
+          Row(
+            children: [
+              const Icon(Icons.route, color: Color(0xFF2196F3), size: 16),
+              const SizedBox(width: 6),
+              const Expanded(
+                child: Text(
+                  'Travel Info',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF2196F3),
+                  ),
+                ),
+              ),
+              GestureDetector(
+                onTap: () {
+                  setState(() {
+                    _isDistancePanelCollapsed = true;
+                  });
+                },
+                child: const Icon(Icons.close, size: 16, color: Colors.grey),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+
+          // Distance and time info - more compact
+          _buildCompactTravelInfoRow(
+            icon: Icons.directions_walk,
+            label: 'Walk',
+            distance: distances['walking']!,
+            time: times['walking']!,
+            color: const Color(0xFF4CAF50),
+          ),
+          const SizedBox(height: 8),
+
+          _buildCompactTravelInfoRow(
+            icon: Icons.directions_car,
+            label: 'Drive',
+            distance: distances['driving']!,
+            time: times['driving']!,
+            color: const Color(0xFF2196F3),
+          ),
+          const SizedBox(height: 8),
+
+          _buildCompactTravelInfoRow(
+            icon: Icons.two_wheeler,
+            label: 'Ride',
+            distance: distances['riding']!,
+            time: times['riding']!,
+            color: const Color(0xFFFF9800),
+          ),
+          const SizedBox(height: 8),
+
+          _buildCompactTravelInfoRow(
+            icon: Icons.straighten,
+            label: 'Direct',
+            distance: distances['straight']!,
+            time: '',
+            color: const Color(0xFF9E9E9E),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Build compact travel info row
+  Widget _buildCompactTravelInfoRow({
+    required IconData icon,
+    required String label,
+    required String distance,
+    required String time,
+    required Color color,
+  }) {
+    return Row(
+      children: [
+        Icon(icon, size: 14, color: color),
+        const SizedBox(width: 6),
+        Expanded(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: Colors.black87,
+            ),
+          ),
+        ),
+        Flexible(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                distance,
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                  color: color,
+                ),
+              ),
+              if (time.isNotEmpty)
+                Text(
+                  time,
+                  style: TextStyle(fontSize: 10, color: Colors.grey[600]),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // Get different colors for artisan routes
+  Color _getArtisanRouteColor(int index) {
+    final List<Color> routeColors = [
+      const Color(0xFF4CAF50), // Green
+      const Color(0xFF2196F3), // Blue
+      const Color(0xFFFF5722), // Orange
+      const Color(0xFF9C27B0), // Purple
+      const Color(0xFFE91E63), // Pink
+      const Color(0xFF00BCD4), // Cyan
+      const Color(0xFFFF9800), // Amber
+      const Color(0xFF795548), // Brown
+    ];
+
+    return routeColors[index % routeColors.length];
   }
 
   // Adjust map camera to show user location and all artisan markers
@@ -1105,102 +1922,6 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         50, // Padding in pixels
       ),
     );
-  }
-
-  // Generate realistic route points (simulating road paths)
-  List<LatLng> _generateRealisticRoute(LatLng start, LatLng end) {
-    final List<LatLng> routePoints = [];
-
-    // Calculate distance and direction
-    final double distance = _calculateDistance(
-      start.latitude,
-      start.longitude,
-      end.latitude,
-      end.longitude,
-    );
-
-    // For short distances (< 1km), use a simple curved path
-    if (distance < 1.0) {
-      // Create a gentle curve with 3-5 intermediate points
-      final int numPoints =
-          3 + (distance * 2).round(); // More points for longer distances
-
-      for (int i = 0; i <= numPoints; i++) {
-        final double progress = i / numPoints;
-        final double t = progress;
-
-        // Create a curved path using quadratic Bezier-like interpolation
-        final double lat = start.latitude + (end.latitude - start.latitude) * t;
-        final double lng =
-            start.longitude + (end.longitude - start.longitude) * t;
-
-        // Add some realistic variation (simulating road curves)
-        if (i > 0 && i < numPoints) {
-          final double variation =
-              0.0001 * sin(progress * pi * 2); // Small curve variation
-          final double perpendicularLat = -sin(progress * pi) * variation;
-          final double perpendicularLng = cos(progress * pi) * variation;
-
-          routePoints.add(
-            LatLng(lat + perpendicularLat, lng + perpendicularLng),
-          );
-        } else {
-          routePoints.add(LatLng(lat, lng));
-        }
-      }
-    } else {
-      // For longer distances, create more complex route with multiple waypoints
-      final int numPoints = 5 + (distance * 3).round();
-
-      for (int i = 0; i <= numPoints; i++) {
-        final double progress = i / numPoints;
-        final double t = progress;
-
-        // Base linear interpolation
-        final double lat = start.latitude + (end.latitude - start.latitude) * t;
-        final double lng =
-            start.longitude + (end.longitude - start.longitude) * t;
-
-        // Add realistic road-like variations
-        if (i > 0 && i < numPoints) {
-          // Simulate road turns and curves
-          final double curveIntensity =
-              0.0002 * distance; // Stronger curves for longer distances
-          final double curve1 = sin(progress * pi * 3) * curveIntensity;
-          final double curve2 = cos(progress * pi * 2) * curveIntensity * 0.5;
-
-          routePoints.add(LatLng(lat + curve1, lng + curve2));
-        } else {
-          routePoints.add(LatLng(lat, lng));
-        }
-      }
-    }
-
-    return routePoints;
-  }
-
-  // Calculate distance between two points (helper for route generation)
-  double _calculateDistance(
-    double lat1,
-    double lon1,
-    double lat2,
-    double lon2,
-  ) {
-    const double R = 6371; // Earth's radius in kilometers
-    final double dLat = _toRadians(lat2 - lat1);
-    final double dLon = _toRadians(lon2 - lon1);
-    final double a =
-        sin(dLat / 2) * sin(dLat / 2) +
-        cos(_toRadians(lat1)) *
-            cos(_toRadians(lat2)) *
-            sin(dLon / 2) *
-            sin(dLon / 2);
-    final double c = 2 * atan2(sqrt(a), sqrt(1 - a));
-    return R * c;
-  }
-
-  double _toRadians(double degrees) {
-    return degrees * (pi / 180);
   }
 
   // Navigate to artisan profile page
@@ -1434,19 +2155,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
           Row(
             children: [
               // Avatar
-              Container(
-                width: 50,
-                height: 50,
-                decoration: BoxDecoration(
-                  color: const Color(0xFF2196F3),
-                  borderRadius: BorderRadius.circular(25),
-                ),
-                child: Center(
-                  child: Text(
-                    artisan['avatar'] ?? '👨‍🔧',
-                    style: const TextStyle(fontSize: 24),
-                  ),
-                ),
+              CircleAvatar(
+                radius: 25,
+                backgroundColor: const Color(0xFF2196F3),
+                backgroundImage:
+                    artisan['avatar'] != null &&
+                        artisan['avatar'].toString().startsWith('http')
+                    ? NetworkImage(artisan['avatar'])
+                    : null,
+                child:
+                    artisan['avatar'] == null ||
+                        !artisan['avatar'].toString().startsWith('http')
+                    ? const Icon(Icons.person, color: Colors.white, size: 24)
+                    : null,
               ),
 
               const SizedBox(width: 16),
@@ -1742,6 +2463,10 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
         // Top App Bar - Only hamburger menu and notification icon
         _buildTopAppBar(),
+
+        // Distance Information Panel
+        if (_foundArtisans.isNotEmpty)
+          Positioned(top: 140, right: 16, child: _buildDistancePanel()),
 
         // Draggable Sheet
         Positioned(bottom: 0, left: 0, right: 0, child: _buildDraggableSheet()),
@@ -3099,7 +3824,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                   children: [
                     // Drag Handle
                     Container(
-                      margin: const EdgeInsets.only(top: 12, bottom: 8),
+                      margin: const EdgeInsets.only(top: 8, bottom: 6),
                       width: 40,
                       height: 4,
                       decoration: BoxDecoration(
@@ -3110,7 +3835,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
                     // Fixed Search Section
                     Container(
-                      padding: const EdgeInsets.all(20),
+                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
@@ -3118,20 +3843,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                           const Text(
                             'Find Your Perfect Service',
                             style: TextStyle(
-                              fontSize: 24,
+                              fontSize: 22,
                               fontWeight: FontWeight.bold,
                               color: Color(0xFF1A1A1A),
                             ),
                           ),
-                          const SizedBox(height: 8),
+                          const SizedBox(height: 6),
                           Text(
                             'Search for trusted professionals in your area',
                             style: TextStyle(
-                              fontSize: 16,
+                              fontSize: 15,
                               color: Colors.grey.shade600,
                             ),
                           ),
-                          const SizedBox(height: 20),
+                          const SizedBox(height: 16),
 
                           // Search Bar
                           Container(
@@ -3170,7 +3895,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 border: InputBorder.none,
                                 contentPadding: const EdgeInsets.symmetric(
                                   horizontal: 20,
-                                  vertical: 16,
+                                  vertical: 14,
                                 ),
                               ),
                             ),
@@ -3184,7 +3909,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     if (_showSuggestions && _searchSuggestions.isNotEmpty)
                       Flexible(
                         child: Container(
-                          margin: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                          margin: const EdgeInsets.fromLTRB(20, 0, 20, 4),
                           decoration: BoxDecoration(
                             color: Colors.white,
                             borderRadius: BorderRadius.circular(12),
@@ -3201,12 +3926,19 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                             itemCount: _searchSuggestions.length,
                             itemBuilder: (context, index) {
                               final suggestion = _searchSuggestions[index];
+                              final isNoResults =
+                                  suggestion['type'] == 'no_results';
+
                               return ListTile(
                                 leading: Icon(
-                                  suggestion['type'] == 'service'
+                                  isNoResults
+                                      ? Icons.search_off
+                                      : suggestion['type'] == 'service'
                                       ? Icons.build
                                       : Icons.category,
-                                  color: suggestion['color'] != null
+                                  color: isNoResults
+                                      ? Colors.grey
+                                      : suggestion['color'] != null
                                       ? Color(
                                           int.parse(
                                             '0xFF${suggestion['color'].substring(1)}',
@@ -3216,13 +3948,20 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                 ),
                                 title: Text(
                                   suggestion['name'],
-                                  style: const TextStyle(
+                                  style: TextStyle(
                                     fontWeight: FontWeight.w500,
                                     fontSize: 16,
+                                    color: isNoResults ? Colors.grey : null,
+                                    fontStyle: isNoResults
+                                        ? FontStyle.italic
+                                        : null,
                                   ),
                                 ),
                                 subtitle: Text(
-                                  suggestion['type'] == 'service'
+                                  isNoResults
+                                      ? suggestion['description'] ??
+                                            'Try a different search term'
+                                      : suggestion['type'] == 'service'
                                       ? 'Service'
                                       : 'Category',
                                   style: TextStyle(
@@ -3230,14 +3969,16 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                                     fontSize: 12,
                                   ),
                                 ),
-                                onTap: () => _onSuggestionSelected(suggestion),
+                                onTap: isNoResults
+                                    ? null
+                                    : () => _onSuggestionSelected(suggestion),
                               );
                             },
                           ),
                         ),
                       ),
 
-                    // Scrollable Content Section
+                    // Scrollable Content Section - Made more flexible
                     Expanded(
                       child: SingleChildScrollView(
                         padding: const EdgeInsets.symmetric(horizontal: 20),

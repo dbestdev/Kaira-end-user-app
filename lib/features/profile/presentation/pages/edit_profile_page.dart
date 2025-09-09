@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../../../../core/utils/phone_utils.dart';
 import '../../../../core/constants/app_constants.dart';
+import '../../../../core/services/storage_service.dart';
 import 'dart:io';
 import 'dart:convert';
 
@@ -25,10 +26,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   File? _selectedImage;
   bool _isLoading = false;
+  late final StorageService _storageService;
 
   @override
   void initState() {
     super.initState();
+    _storageService = StorageService(FlutterSecureStorage());
     _initializeFields();
   }
 
@@ -114,20 +117,23 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
-  Future<void> _saveProfile() async {
-    if (!_formKey.currentState!.validate()) {
-      return;
-    }
+  void _cancelPhotoSelection() {
+    setState(() {
+      _selectedImage = null;
+    });
+  }
+
+  Future<void> _saveProfilePicture() async {
+    if (_selectedImage == null) return;
 
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString(AppConstants.tokenKey);
+      final token = await _storageService.getAuthToken();
 
-      if (token == null) {
+      if (token == null || token.isEmpty) {
         throw Exception('No authentication token found');
       }
 
@@ -141,23 +147,15 @@ class _EditProfilePageState extends State<EditProfilePage> {
       request.headers['Authorization'] = 'Bearer $token';
       request.headers['Content-Type'] = 'multipart/form-data';
 
-      // Add form fields
-      request.fields['firstName'] = _firstNameController.text.trim();
-      request.fields['lastName'] = _lastNameController.text.trim();
-      request.fields['email'] = _emailController.text.trim();
-      request.fields['phoneNumber'] = _phoneController.text.trim();
-
-      // Add profile picture if selected
-      if (_selectedImage != null) {
-        final fileBytes = await _selectedImage!.readAsBytes();
-        final multipartFile = http.MultipartFile.fromBytes(
-          'profilePicture',
-          fileBytes,
-          filename:
-              'profile_picture_${DateTime.now().millisecondsSinceEpoch}.jpg',
-        );
-        request.files.add(multipartFile);
-      }
+      // Add profile picture
+      final fileBytes = await _selectedImage!.readAsBytes();
+      final multipartFile = http.MultipartFile.fromBytes(
+        'profilePicture',
+        fileBytes,
+        filename:
+            'profile_picture_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      );
+      request.files.add(multipartFile);
 
       // Send the request
       final streamedResponse = await request.send();
@@ -169,31 +167,40 @@ class _EditProfilePageState extends State<EditProfilePage> {
         if (responseData['success'] == true) {
           // Update local storage with new user data
           final updatedUserData = responseData['data']['user'];
-          await prefs.setString('userData', jsonEncode(updatedUserData));
+          await _storageService.storeUserData(jsonEncode(updatedUserData));
 
           if (mounted) {
+            setState(() {
+              _selectedImage =
+                  null; // Clear selected image after successful save
+            });
+
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text('Profile updated successfully!'),
+                content: Text('Profile picture updated successfully!'),
                 backgroundColor: Colors.green,
               ),
             );
-            Navigator.of(context).pop(updatedUserData); // Return updated data
+
+            // Return updated data to parent
+            Navigator.of(context).pop(updatedUserData);
           }
         } else {
           throw Exception(
-            responseData['message'] ?? 'Failed to update profile',
+            responseData['message'] ?? 'Failed to update profile picture',
           );
         }
       } else {
         final errorData = jsonDecode(response.body);
-        throw Exception(errorData['message'] ?? 'Failed to update profile');
+        throw Exception(
+          errorData['message'] ?? 'Failed to update profile picture',
+        );
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error updating profile: $e'),
+            content: Text('Error updating profile picture: $e'),
             backgroundColor: Colors.red,
           ),
         );
@@ -219,61 +226,39 @@ class _EditProfilePageState extends State<EditProfilePage> {
         backgroundColor: const Color(0xFF2196F3),
         foregroundColor: Colors.white,
         elevation: 0,
-        actions: [
-          TextButton(
-            onPressed: _isLoading ? null : _saveProfile,
-            child: Text(
-              'Save',
-              style: TextStyle(
-                color: _isLoading ? Colors.white70 : Colors.white,
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
-              ),
-            ),
-          ),
-        ],
       ),
-      body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                valueColor: AlwaysStoppedAnimation<Color>(Color(0xFF2196F3)),
-              ),
-            )
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Profile Picture Section
-                    _buildProfilePictureSection(),
-                    const SizedBox(height: 32),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Profile Picture Section
+              _buildProfilePictureSection(),
+              const SizedBox(height: 32),
 
-                    // Personal Information Section
-                    _buildSectionHeader('Personal Information', Icons.person),
-                    const SizedBox(height: 16),
-                    _buildPersonalInfoSection(),
-                    const SizedBox(height: 32),
+              // Personal Information Section
+              _buildSectionHeader('Personal Information', Icons.person),
+              const SizedBox(height: 16),
+              _buildPersonalInfoSection(),
+              const SizedBox(height: 32),
 
-                    // Contact Information Section
-                    _buildSectionHeader(
-                      'Contact Information',
-                      Icons.contact_phone,
-                    ),
-                    const SizedBox(height: 16),
-                    _buildContactInfoSection(),
-                    const SizedBox(height: 32),
+              // Contact Information Section
+              _buildSectionHeader('Contact Information', Icons.contact_phone),
+              const SizedBox(height: 16),
+              _buildContactInfoSection(),
+              const SizedBox(height: 32),
 
-                    // Security Section
-                    _buildSectionHeader('Security', Icons.security),
-                    const SizedBox(height: 16),
-                    _buildSecuritySection(),
-                    const SizedBox(height: 32),
-                  ],
-                ),
-              ),
-            ),
+              // Security Section
+              _buildSectionHeader('Security', Icons.security),
+              const SizedBox(height: 16),
+              _buildSecuritySection(),
+              const SizedBox(height: 32),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -281,53 +266,103 @@ class _EditProfilePageState extends State<EditProfilePage> {
     return Center(
       child: Column(
         children: [
-          GestureDetector(
-            onTap: _showImagePicker,
-            child: Container(
-              width: 120,
-              height: 120,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: const Color(0xFF2196F3), width: 3),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+          Stack(
+            children: [
+              GestureDetector(
+                onTap: _selectedImage == null ? _showImagePicker : null,
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: _selectedImage != null
+                          ? Colors.orange
+                          : const Color(0xFF2196F3),
+                      width: 3,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
                   ),
-                ],
+                  child: ClipOval(
+                    child: _selectedImage != null
+                        ? Image.file(
+                            _selectedImage!,
+                            width: 120,
+                            height: 120,
+                            fit: BoxFit.cover,
+                          )
+                        : (widget.userData?['profilePicture'] != null)
+                        ? Image.network(
+                            widget.userData!['profilePicture'],
+                            width: 120,
+                            height: 120,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return _buildDefaultAvatar();
+                            },
+                          )
+                        : _buildDefaultAvatar(),
+                  ),
+                ),
               ),
-              child: ClipOval(
-                child: _selectedImage != null
-                    ? Image.file(
-                        _selectedImage!,
-                        width: 120,
-                        height: 120,
-                        fit: BoxFit.cover,
-                      )
-                    : (widget.userData?['profilePicture'] != null)
-                    ? Image.network(
-                        widget.userData!['profilePicture'],
-                        width: 120,
-                        height: 120,
-                        fit: BoxFit.cover,
-                        errorBuilder: (context, error, stackTrace) {
-                          return _buildDefaultAvatar();
-                        },
-                      )
-                    : _buildDefaultAvatar(),
-              ),
-            ),
+              // Loading overlay
+              if (_isLoading)
+                Positioned.fill(
+                  child: Container(
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.black.withValues(alpha: 0.6),
+                    ),
+                    child: const Center(
+                      child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                        strokeWidth: 3,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
           const SizedBox(height: 12),
-          TextButton.icon(
-            onPressed: _showImagePicker,
-            icon: const Icon(Icons.camera_alt, size: 18),
-            label: const Text('Change Photo'),
-            style: TextButton.styleFrom(
-              foregroundColor: const Color(0xFF2196F3),
-            ),
-          ),
+          _selectedImage == null
+              ? TextButton.icon(
+                  onPressed: _showImagePicker,
+                  icon: const Icon(Icons.camera_alt, size: 18),
+                  label: const Text('Change Photo'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF2196F3),
+                  ),
+                )
+              : Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextButton.icon(
+                      onPressed: _cancelPhotoSelection,
+                      icon: const Icon(Icons.close, size: 18),
+                      label: const Text('Cancel'),
+                      style: TextButton.styleFrom(foregroundColor: Colors.red),
+                    ),
+                    const SizedBox(width: 16),
+                    TextButton.icon(
+                      onPressed: _isLoading ? null : _saveProfilePicture,
+                      icon: const Icon(Icons.check, size: 18),
+                      label: Text(_isLoading ? 'Saving...' : 'Save'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: _isLoading
+                            ? Colors.grey
+                            : const Color(0xFF2196F3),
+                      ),
+                    ),
+                  ],
+                ),
         ],
       ),
     );
@@ -365,28 +400,16 @@ class _EditProfilePageState extends State<EditProfilePage> {
   Widget _buildPersonalInfoSection() {
     return Column(
       children: [
-        _buildTextField(
+        _buildReadOnlyFieldWithoutEdit(
           controller: _firstNameController,
           label: 'First Name',
           icon: Icons.person_outline,
-          validator: (value) {
-            if (value == null || value.trim().isEmpty) {
-              return 'First name is required';
-            }
-            return null;
-          },
         ),
         const SizedBox(height: 16),
-        _buildTextField(
+        _buildReadOnlyFieldWithoutEdit(
           controller: _lastNameController,
           label: 'Last Name',
           icon: Icons.person_outline,
-          validator: (value) {
-            if (value == null || value.trim().isEmpty) {
-              return 'Last name is required';
-            }
-            return null;
-          },
         ),
       ],
     );
@@ -579,17 +602,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
-  Widget _buildTextField({
+  Widget _buildReadOnlyFieldWithoutEdit({
     required TextEditingController controller,
     required String label,
     required IconData icon,
-    TextInputType? keyboardType,
-    String? Function(String?)? validator,
   }) {
     return TextFormField(
       controller: controller,
-      keyboardType: keyboardType,
-      validator: validator,
+      readOnly: true,
       decoration: InputDecoration(
         labelText: label,
         prefixIcon: Icon(icon, color: const Color(0xFF2196F3)),
@@ -605,16 +625,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: Color(0xFF2196F3), width: 2),
         ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.red),
-        ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: Colors.red, width: 2),
-        ),
         filled: true,
-        fillColor: Colors.white,
+        fillColor: Colors.grey.shade50,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 16,

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'dart:async';
 import 'dart:convert';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/auth_service.dart';
+import '../../../../core/services/storage_service.dart';
 
 class OtpVerificationPage extends StatefulWidget {
   final Map<String, dynamic> signUpData;
@@ -167,13 +168,9 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
       // Start the SMS resend timer
       _startSmsResendTimer();
 
-      // Clear success message after 3 seconds
-      Future.delayed(const Duration(seconds: 3), () {
-        if (mounted) {
-          setState(() {
-            _successMessage = null;
-          });
-        }
+      // Clear success message immediately
+      setState(() {
+        _successMessage = null;
       });
     }
   }
@@ -207,13 +204,9 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
         // Start the email resend timer when email OTP section becomes visible
         _startEmailResendTimer();
 
-        // Clear success message after 1 second
-        Future.delayed(const Duration(seconds: 1), () {
-          if (mounted) {
-            setState(() {
-              _successMessage = null;
-            });
-          }
+        // Clear success message immediately
+        setState(() {
+          _successMessage = null;
         });
 
         // Email OTP is automatically sent by backend after SMS verification
@@ -295,17 +288,23 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
         });
 
         // Store user data and authentication status immediately
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('isLoggedIn', true);
+        final storageService = StorageService(FlutterSecureStorage());
+        await storageService.initialize();
 
         // Store user data from the response
         if (data != null && data['user'] != null) {
-          await prefs.setString('userData', jsonEncode(data['user']));
+          await storageService.storeUserData(jsonEncode(data['user']));
 
           // Store auth token if available
           final accessToken = data['accessToken'];
           if (accessToken != null) {
-            await prefs.setString('auth_token', accessToken);
+            print(
+              'Storing auth token from OTP verification: ${accessToken.substring(0, 20)}...',
+            );
+            await storageService.storeAuthToken(accessToken);
+            print('Auth token stored successfully from OTP verification');
+          } else {
+            print('No access token found in OTP verification response');
           }
         }
 
@@ -380,13 +379,9 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
         // Reset SMS resend timer
         _resetSmsResendTimer();
 
-        // Clear success message after 1 second
-        Future.delayed(const Duration(seconds: 1), () {
-          if (mounted) {
-            setState(() {
-              _successMessage = null;
-            });
-          }
+        // Clear success message immediately
+        setState(() {
+          _successMessage = null;
         });
       }
     } catch (e) {
@@ -442,13 +437,9 @@ class _OtpVerificationPageState extends State<OtpVerificationPage>
         // Reset email resend timer
         _resetEmailResendTimer();
 
-        // Clear success message after 1 second
-        Future.delayed(const Duration(seconds: 1), () {
-          if (mounted) {
-            setState(() {
-              _successMessage = null;
-            });
-          }
+        // Clear success message immediately
+        setState(() {
+          _successMessage = null;
         });
       }
     } catch (e) {

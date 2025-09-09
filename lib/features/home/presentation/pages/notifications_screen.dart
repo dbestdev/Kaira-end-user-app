@@ -101,6 +101,53 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     }
   }
 
+  void _updateStatsAfterRead() {
+    if (_stats != null) {
+      setState(() {
+        _stats = NotificationStats(
+          total: _stats!.total,
+          unread: _stats!.unread - 1,
+          read: _stats!.read + 1,
+          archived: _stats!.archived,
+          byType: _stats!.byType,
+          byPriority: _stats!.byPriority,
+        );
+      });
+    }
+  }
+
+  void _updateStatsAfterDelete(NotificationModel notification) {
+    if (_stats != null) {
+      setState(() {
+        _stats = NotificationStats(
+          total: _stats!.total - 1,
+          unread: notification.isUnread ? _stats!.unread - 1 : _stats!.unread,
+          read: notification.isRead ? _stats!.read - 1 : _stats!.read,
+          archived: notification.isArchived
+              ? _stats!.archived - 1
+              : _stats!.archived,
+          byType: _stats!.byType,
+          byPriority: _stats!.byPriority,
+        );
+      });
+    }
+  }
+
+  void _updateStatsAfterMarkAllRead() {
+    if (_stats != null) {
+      setState(() {
+        _stats = NotificationStats(
+          total: _stats!.total,
+          unread: 0,
+          read: _stats!.read + _stats!.unread,
+          archived: _stats!.archived,
+          byType: _stats!.byType,
+          byPriority: _stats!.byPriority,
+        );
+      });
+    }
+  }
+
   Future<void> _loadMoreNotifications() async {
     if (_isLoadingMore || !_hasMoreData) return;
 
@@ -114,8 +161,7 @@ class _NotificationsScreenState extends State<NotificationsScreen>
 
   Future<void> _markAsRead(NotificationModel notification) async {
     try {
-      await _notificationsService.markAsRead(notification.id);
-
+      // Optimistically update the UI first for immediate feedback
       setState(() {
         final index = _notifications.indexWhere((n) => n.id == notification.id);
         if (index != -1) {
@@ -125,6 +171,22 @@ class _NotificationsScreenState extends State<NotificationsScreen>
           );
         }
       });
+
+      // Then get the updated notification from the server
+      final updatedNotification = await _notificationsService.markAsRead(
+        notification.id,
+      );
+
+      // Update with the actual server response
+      setState(() {
+        final index = _notifications.indexWhere((n) => n.id == notification.id);
+        if (index != -1) {
+          _notifications[index] = updatedNotification;
+        }
+      });
+
+      // Update stats to reflect the change
+      _updateStatsAfterRead();
 
       // Notify parent widget that notification status changed
       widget.onNotificationChanged?.call();
@@ -139,6 +201,14 @@ class _NotificationsScreenState extends State<NotificationsScreen>
         );
       }
     } catch (e) {
+      // Revert the optimistic update on error
+      setState(() {
+        final index = _notifications.indexWhere((n) => n.id == notification.id);
+        if (index != -1) {
+          _notifications[index] = notification;
+        }
+      });
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -154,6 +224,9 @@ class _NotificationsScreenState extends State<NotificationsScreen>
     try {
       await _notificationsService.markAllAsRead();
       await _loadNotifications(refresh: true);
+
+      // Update stats to reflect all notifications marked as read
+      _updateStatsAfterMarkAllRead();
 
       // Notify parent widget that notification status changed
       widget.onNotificationChanged?.call();
@@ -186,6 +259,9 @@ class _NotificationsScreenState extends State<NotificationsScreen>
       setState(() {
         _notifications.removeWhere((n) => n.id == notification.id);
       });
+
+      // Update stats to reflect the deletion
+      _updateStatsAfterDelete(notification);
 
       // Notify parent widget that notification status changed
       widget.onNotificationChanged?.call();
